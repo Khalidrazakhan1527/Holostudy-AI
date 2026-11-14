@@ -1,0 +1,420 @@
+import { useRef, useState } from 'react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { Html, OrbitControls, Sparkles } from '@react-three/drei'
+import * as THREE from 'three'
+import type { Element } from '../data/elements'
+
+type AtomicStructure3DProps = {
+  element: Element
+  ionCharge?: number
+  showLabels: boolean
+  autoRotate?: boolean
+  displayMode?: 'default' | 'dark' | 'glass'
+  zoomCommand?: { direction: 'in' | 'out'; id: number } | null
+  onZoomComplete?: () => void
+}
+
+type FocusTarget = {
+  position: THREE.Vector3
+  distance: number
+  id: number
+} | null
+
+function AtomicCameraFocus({ target }: { target: FocusTarget }) {
+  const { camera, controls } = useThree() as {
+    camera: THREE.PerspectiveCamera
+    controls: { target: THREE.Vector3; update: () => void } | null
+  }
+
+  const animation = useRef<{
+    fromPosition: THREE.Vector3
+    toPosition: THREE.Vector3
+    fromTarget: THREE.Vector3
+    toTarget: THREE.Vector3
+    elapsed: number
+    duration: number
+  } | null>(null)
+
+  const lastTargetId = useRef<number | null>(null)
+
+  useFrame((_, delta) => {
+    if (target && lastTargetId.current !== target.id) {
+      lastTargetId.current = target.id
+      const currentTarget = controls?.target.clone() ?? new THREE.Vector3()
+      const direction = camera.position.clone().sub(currentTarget).normalize()
+      const destination = target.position.clone()
+
+      animation.current = {
+        fromPosition: camera.position.clone(),
+        toPosition: destination.clone().add(direction.multiplyScalar(target.distance)),
+        fromTarget: currentTarget,
+        toTarget: destination,
+        elapsed: 0,
+        duration: 0.65,
+      }
+    }
+
+    const active = animation.current
+    if (!active) return
+
+    active.elapsed += delta
+    const progress = Math.min(active.elapsed / active.duration, 1)
+    const eased = progress * progress * (3 - 2 * progress)
+
+    camera.position.lerpVectors(active.fromPosition, active.toPosition, eased)
+
+    if (controls) {
+      controls.target.lerpVectors(active.fromTarget, active.toTarget, eased)
+      controls.update()
+    }
+
+    if (progress >= 1) animation.current = null
+  })
+
+  return null
+}
+
+function ElectronOrbit({
+  radius,
+  tilt,
+  speed,
+  phase,
+  electrons,
+  shellNumber,
+  showLabels,
+  onFocus,
+}: {
+  radius: number
+  tilt: number
+  speed: number
+  phase: number
+  electrons: number
+  shellNumber: number
+  showLabels: boolean
+  onFocus: (position: THREE.Vector3, distance: number) => void
+}) {
+  const groupRef = useRef<THREE.Group>(null)
+  const electronRefs = useRef<Array<THREE.Mesh | null>>([])
+
+  useFrame((_, delta) => {
+    if (!groupRef.current) return
+    groupRef.current.rotation.y += delta * speed
+
+    electronRefs.current.forEach((mesh, index) => {
+      if (!mesh) return
+      const angle = phase + (index / Math.max(electrons, 1)) * Math.PI * 2
+      mesh.position.set(
+        Math.cos(angle) * radius,
+        Math.sin(angle) * radius * 0.16,
+        Math.sin(angle) * radius,
+      )
+    })
+  })
+
+  return (
+    <group rotation={[tilt * 0.35, tilt, tilt * 0.2]}>
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[radius, 0.009, 8, 120]} />
+        <meshBasicMaterial color="#37cfff" transparent opacity={0.45} />
+      </mesh>
+
+      <group ref={groupRef}>
+        {Array.from({ length: electrons }, (_, index) => (
+          <mesh
+            key={`${shellNumber}-${index}`}
+            ref={(mesh) => {
+              electronRefs.current[index] = mesh
+            }}
+            position={[
+              Math.cos(phase + (index / Math.max(electrons, 1)) * Math.PI * 2) * radius,
+              0,
+              Math.sin(phase + (index / Math.max(electrons, 1)) * Math.PI * 2) * radius,
+            ]}
+            onClick={(event) => {
+              event.stopPropagation()
+              const mesh = electronRefs.current[index]
+              if (mesh) {
+                onFocus(mesh.getWorldPosition(new THREE.Vector3()), 1.8)
+              }
+            }}
+          >
+            <sphereGeometry args={[0.11, 20, 20]} />
+            <meshStandardMaterial
+              color="#53e7ff"
+              emissive="#079bd8"
+              emissiveIntensity={2.5}
+              metalness={0.2}
+              roughness={0.2}
+            />
+          </mesh>
+        ))}
+      </group>
+
+      {showLabels && (
+        <Html position={[radius, 0.15, 0]} center distanceFactor={10}>
+          <div className="layer-label">Shell {shellNumber}</div>
+        </Html>
+      )}
+    </group>
+  )
+}
+
+function Nucleus({
+  element,
+  showLabels,
+  onFocus,
+}: {
+  element: Element
+  showLabels: boolean
+  onFocus: (position: THREE.Vector3, distance: number) => void
+}) {
+  const protonCount = element.atomicNumber
+  const neutronCount =
+    element.commonMassNumber === null
+      ? null
+      : Math.max(0, element.commonMassNumber - protonCount)
+
+  const particles = Array.from(
+    { length: protonCount + (neutronCount ?? 0) },
+    (_, index) => {
+      const angle = index * 2.399963
+      const radius = 0.2 + 0.58 * Math.sqrt((index + 0.5) / Math.max(protonCount + (neutronCount ?? 0), 1))
+      const isProton = index < protonCount
+
+      return {
+        id: index,
+        proton: isProton,
+        position: [
+          Math.cos(angle) * radius,
+          Math.sin(angle) * radius,
+          Math.sin(index * 1.7) * 0.42,
+        ] as [number, number, number],
+      }
+    },
+  )
+
+  return (
+    <group>
+      {particles.map((particle) => (
+        <mesh
+          key={particle.id}
+          position={particle.position}
+          onClick={(event) => {
+            event.stopPropagation()
+            onFocus(new THREE.Vector3(...particle.position), 1.35)
+          }}
+        >
+          <sphereGeometry args={[0.22, 18, 18]} />
+          <meshStandardMaterial
+            color={particle.proton ? '#ff557d' : '#8a80ff'}
+            emissive={particle.proton ? '#b91c48' : '#453ac2'}
+            emissiveIntensity={0.65}
+            roughness={0.3}
+            metalness={0.15}
+          />
+        </mesh>
+      ))}
+
+      <mesh
+        onClick={(event) => {
+          event.stopPropagation()
+          onFocus(new THREE.Vector3(0, 0, 0), 2.1)
+        }}
+      >
+        <sphereGeometry args={[0.95, 24, 24]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+
+      {showLabels && (
+        <Html position={[0, 1.25, 0]} center distanceFactor={10}>
+          <div className="layer-label">
+            Nucleus · {protonCount} p
+            {neutronCount === null ? '' : ` · ${neutronCount} n`}
+          </div>
+        </Html>
+      )}
+    </group>
+  )
+}
+
+function AtomScene({
+  element,
+  ionCharge = 0,
+  showLabels,
+  autoRotate,
+  displayMode,
+  zoomCommand,
+  onZoomComplete,
+}: AtomicStructure3DProps) {
+  const atomRef = useRef<THREE.Group>(null)
+  const lastZoomId = useRef<number | null>(null)
+  const { camera, controls } = useThree() as {
+    camera: THREE.PerspectiveCamera
+    controls: { target: THREE.Vector3; update: () => void } | null
+  }
+
+  useFrame(() => {
+    if (!zoomCommand || lastZoomId.current === zoomCommand.id || !controls) return
+
+    lastZoomId.current = zoomCommand.id
+    const target = controls.target
+    const direction = camera.position.clone().sub(target)
+    const distance = direction.length()
+    const factor = zoomCommand.direction === 'in' ? 0.72 : 1.38
+    const nextDistance = THREE.MathUtils.clamp(distance * factor, 0.5, 12)
+
+    direction.normalize().multiplyScalar(nextDistance)
+    camera.position.copy(target).add(direction)
+    controls.update()
+    onZoomComplete?.()
+  })
+  const nextFocusId = useRef(0)
+  const [focusTarget, setFocusTarget] = useState<FocusTarget>(null)
+
+  const focusParticle = (position: THREE.Vector3, distance: number) => {
+    nextFocusId.current += 1
+    setFocusTarget({
+      position: position.clone(),
+      distance,
+      id: nextFocusId.current,
+    })
+  }
+
+  useFrame((_, delta) => {
+    if (atomRef.current && autoRotate) {
+      atomRef.current.rotation.y += delta * 0.35
+    }
+  })
+
+  const background = displayMode === 'dark' ? '#101827' : '#f7faff'
+  const electronCount = Math.max(0, element.atomicNumber - (ionCharge ?? 0))
+
+  // Start with the element's neutral shell distribution, then adjust
+  // the outer shell to represent the selected ion charge.
+  const shellOccupancies = element.shells.length
+    ? [...element.shells]
+    : [element.atomicNumber]
+
+  const neutralShellTotal = shellOccupancies.reduce((sum, count) => sum + count, 0)
+
+  if (neutralShellTotal !== element.atomicNumber) {
+    shellOccupancies.splice(0, shellOccupancies.length, element.atomicNumber)
+  }
+
+  let difference = electronCount - shellOccupancies.reduce((sum, count) => sum + count, 0)
+
+  if (difference < 0) {
+    for (let i = shellOccupancies.length - 1; i >= 0 && difference < 0; i--) {
+      const removed = Math.min(shellOccupancies[i], -difference)
+      shellOccupancies[i] -= removed
+      difference += removed
+    }
+  } else if (difference > 0) {
+    shellOccupancies[shellOccupancies.length - 1] += difference
+  }
+
+  const shellRadii = shellOccupancies.map(
+    (_, index) => 1.35 + index * 0.42,
+  )
+
+  return (
+    <>
+      {displayMode !== 'glass' && (
+        <>
+          <color attach="background" args={[background]} />
+          <fog attach="fog" args={[background, 10, 22]} />
+        </>
+      )}
+
+      <ambientLight intensity={1.2} />
+      <pointLight position={[4, 5, 6]} intensity={35} color="#c4f5ff" />
+      <pointLight position={[-4, -3, -4]} intensity={20} color="#a99bff" />
+
+      <group ref={atomRef}>
+        <Nucleus
+          element={element}
+          showLabels={showLabels}
+          onFocus={focusParticle}
+        />
+
+        {shellOccupancies.map((count, index) => (
+          <ElectronOrbit
+            key={`${element.atomicNumber}-shell-${index}`}
+            radius={shellRadii[index]}
+            tilt={(index % 3) * 0.72}
+            speed={index % 2 === 0 ? 1.1 : -0.85}
+            phase={index * 0.73}
+            electrons={Math.max(0, Math.min(count, element.atomicNumber))}
+            shellNumber={index + 1}
+            showLabels={showLabels}
+            onFocus={focusParticle}
+          />
+        ))}
+
+        {showLabels && (
+          <>
+            <Html position={[2.6, 0.6, 0]} center distanceFactor={10}>
+              <div className="layer-label">Electrons: {electronCount} (charge {ionCharge ?? 0})</div>
+            </Html>
+            <Html position={[-1.2, -1.35, 0.5]} center distanceFactor={10}>
+              <div className="layer-label">
+                {element.name} ({element.symbol})
+              </div>
+            </Html>
+          </>
+        )}
+      </group>
+
+      <AtomicCameraFocus target={focusTarget} />
+
+      <Sparkles
+        count={35}
+        scale={6}
+        size={1.8}
+        speed={0.25}
+        opacity={0.45}
+        color="#42cfff"
+      />
+
+      <OrbitControls
+        makeDefault
+        enableDamping
+        dampingFactor={0.07}
+        rotateSpeed={0.7}
+        zoomSpeed={1.2}
+        minDistance={0.5}
+        maxDistance={12}
+      />
+    </>
+  )
+}
+
+export default function AtomicStructure3D({
+  element,
+  ionCharge = 0,
+  showLabels,
+  autoRotate = false,
+  displayMode = 'default',
+  zoomCommand,
+  onZoomComplete,
+}: AtomicStructure3DProps) {
+  return (
+    <div className="neural-network-scene">
+      <Canvas
+        camera={{ position: [0, 0.2, 7.5], fov: 38 }}
+        dpr={[1, 1.5]}
+        gl={{ antialias: true, alpha: displayMode === 'glass' }}
+      >
+        <AtomScene
+          element={element}
+          ionCharge={ionCharge}
+          showLabels={showLabels}
+          autoRotate={autoRotate}
+          displayMode={displayMode}
+          zoomCommand={zoomCommand}
+          onZoomComplete={onZoomComplete}
+        />
+      </Canvas>
+    </div>
+  )
+}

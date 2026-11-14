@@ -1,0 +1,2130 @@
+import { useState } from 'react'
+import NeuralNetwork3D from './components/NeuralNetwork3D'
+import AtomicStructure3D from './components/AtomicStructure3D'
+import HumanHeart3D from './components/HumanHeart3D'
+import ComputerArchitecture3D from './components/ComputerArchitecture3D'
+import { ELEMENTS } from './data/elements'
+import {
+  Activity,
+  Atom,
+  BrainCircuit,
+  ChevronDown,
+  CircleHelp,
+  Cpu,
+  Eye,
+  Info,
+  FileImage,
+  FlaskConical,
+  Layers3,
+  Menu,
+  Maximize2,
+  Minimize2,
+  Network,
+  PanelLeftClose,
+  Plus,
+  Rotate3D,
+  Search,
+  Settings2,
+  ShieldCheck,
+  Sparkles,
+  Upload,
+  Waves,
+  ZoomIn,
+  ZoomOut,
+  Bell,
+  Command,
+} from 'lucide-react'
+import './App.css'
+
+type Model = {
+  name: string
+  category: string
+  description: string
+  icon: typeof BrainCircuit
+}
+
+const models: Model[] = [
+  {
+    name: 'Neural Network',
+    category: 'ARTIFICIAL INTELLIGENCE',
+    description: 'Explore neurons, layers and information flow.',
+    icon: BrainCircuit,
+  },
+  {
+    name: 'Atomic Structure',
+    category: 'CHEMISTRY',
+    description: 'Explore protons, neutrons and electrons.',
+    icon: Atom,
+  },
+  {
+    name: 'Human Heart',
+    category: 'BIOLOGY',
+    description: 'Discover the structures of the human heart.',
+    icon: Activity,
+  },
+  {
+    name: 'Computer Architecture',
+    category: 'COMPUTER SCIENCE',
+    description: 'Understand the components of a computer.',
+    icon: Cpu,
+  },
+]
+
+type SelectedNeuron = {
+  id: number
+  layer: number
+  index: number
+  position: [number, number, number]
+  label: string
+}
+
+type NeuronConnectionDetail = {
+  neuronId: number
+  neuronLabel: string
+  weight: number
+  inputValue: number
+  contribution: number
+}
+
+function getNeuronConnectionDetails(neuron: SelectedNeuron) {
+  const layerCounts = [4, 5, 4, 3]
+  const layerStarts = [0, 4, 9, 13]
+
+  const incoming: NeuronConnectionDetail[] = []
+  const outgoing: NeuronConnectionDetail[] = []
+
+  if (neuron.layer > 0) {
+    const previousLayer = neuron.layer - 1
+
+    for (let i = 0; i < layerCounts[previousLayer]; i++) {
+      const sourceId = layerStarts[previousLayer] + i
+      const weight = Number(
+        (Math.sin((sourceId + 1) * (neuron.id + 2)) * 0.8).toFixed(3),
+      )
+      const inputValue = Number(
+        ((sourceId + 2) / (layerCounts[previousLayer] + 2)).toFixed(3),
+      )
+
+      incoming.push({
+        neuronId: sourceId,
+        neuronLabel: `Neuron ${sourceId + 1}`,
+        weight,
+        inputValue,
+        contribution: Number((weight * inputValue).toFixed(3)),
+      })
+    }
+  }
+
+  if (neuron.layer < layerCounts.length - 1) {
+    const nextLayer = neuron.layer + 1
+
+    for (let i = 0; i < layerCounts[nextLayer]; i++) {
+      const targetId = layerStarts[nextLayer] + i
+
+      outgoing.push({
+        neuronId: targetId,
+        neuronLabel: `Neuron ${targetId + 1}`,
+        weight: Number(
+          (Math.sin((neuron.id + 1) * (targetId + 2)) * 0.8).toFixed(3),
+        ),
+        inputValue: 0,
+        contribution: 0,
+      })
+    }
+  }
+
+  const bias = Number((Math.cos(neuron.id + 1) * 0.2).toFixed(3))
+  const weightedSum = Number(
+    (incoming.reduce((sum, item) => sum + item.contribution, 0) + bias).toFixed(3),
+  )
+  const activation = neuron.layer === 0
+    ? Number((0.2 + (neuron.index % 4) * 0.2).toFixed(3))
+    : Number(Math.max(0, weightedSum).toFixed(3))
+
+  return { incoming, outgoing, bias, weightedSum, activation }
+}
+
+function App() {
+  const [selectedNeuron, setSelectedNeuron] = useState<SelectedNeuron | null>(null)
+  const [zoomCommand, setZoomCommand] = useState<{ direction: 'in' | 'out'; id: number } | null>(null)
+  const [showViewerSettings, setShowViewerSettings] = useState(false)
+  const [inspectorFullscreen, setInspectorFullscreen] = useState(false)
+  const [selectedElectron, setSelectedElectron] = useState<{
+    id: string
+    shell: number
+    number: number
+  } | null>(null)
+  const [atomicInspectorFullscreen, setAtomicInspectorFullscreen] = useState(false)
+
+  const neuronDetails = selectedNeuron
+    ? getNeuronConnectionDetails(selectedNeuron)
+    : null
+  const [activePage, setActivePage] = useState('Dashboard')
+  const [selectedModel, setSelectedModel] = useState('Neural Network')
+  const [showModelInformation, setShowModelInformation] = useState(false)
+  const [inspectorDetailFullscreen, setInspectorDetailFullscreen] = useState(false)
+  const [expandedInfoSections, setExpandedInfoSections] = useState<string[]>([
+    'element-properties',
+    'electronic-configuration',
+  ])
+  const [selectedElementNumber, setSelectedElementNumber] = useState(6)
+  const [showElementPicker, setShowElementPicker] = useState(false)
+  const [pendingElementNumber, setPendingElementNumber] = useState(6)
+  const [showInspectorSettings, setShowInspectorSettings] = useState(false)
+  const [inspectorWidth, setInspectorWidth] = useState<'compact' | 'default' | 'wide'>('default')
+  const [inspectorTextSize, setInspectorTextSize] = useState<'small' | 'medium' | 'large'>('medium')
+  const [showDetailedProperties, setShowDetailedProperties] = useState(true)
+  const [ionCharge, setIonCharge] = useState(0)
+  const selectedElement = ELEMENTS.find((element) => element.atomicNumber === selectedElementNumber) ?? ELEMENTS[5]
+  const [search, setSearch] = useState('')
+  const [showLabels, setShowLabels] = useState(true)
+  const [autoRotate, setAutoRotate] = useState(false)
+  const [atomicSimulationOn, setAtomicSimulationOn] = useState(false)
+  const [viewerDisplayMode, setViewerDisplayMode] = useState<'default' | 'dark' | 'glass'>('default')
+  const [rotationCommand, setRotationCommand] = useState<{ direction: 'left' | 'right' | 'up' | 'down' | 'full' | 'reset'; id: number } | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [showModelMenu, setShowModelMenu] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [fullscreenElement, setFullscreenElement] = useState<HTMLDivElement | null>(null)
+
+  useState(() => {
+    const syncFullscreen = () => setIsFullscreen(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', syncFullscreen)
+    return () => document.removeEventListener('fullscreenchange', syncFullscreen)
+  })
+
+  const currentModel =
+    models.find((model) => model.name === selectedModel) ?? models[0]
+
+  const filteredModels = models.filter((model) =>
+    model.name.toLowerCase().includes(search.toLowerCase()),
+  )
+
+  const navigation = [
+    { label: 'Dashboard', icon: Layers3 },
+    { label: 'Explore Models', icon: Network },
+    { label: 'My Models', icon: FileImage },
+    { label: 'What-If Lab', icon: FlaskConical },
+  ]
+
+  function choosePage(page: string) {
+    setActivePage(page)
+    if (page === 'Explore Models') {
+      setShowModelMenu(true)
+    }
+  }
+
+  return (
+    <main className="app-shell">
+      <aside className={`sidebar ${sidebarOpen ? '' : 'sidebar-collapsed'}`}>
+        <div className="brand">
+          <div className="brand-mark">
+            <BrainCircuit size={25} strokeWidth={1.8} />
+            <span className="brand-spark">✦</span>
+          </div>
+          {sidebarOpen && (
+            <div className="brand-copy">
+              <span className="brand-name">HoloStudy<span> AI</span></span>
+              <span className="brand-caption">VISUAL LEARNING STUDIO</span>
+            </div>
+          )}
+          <button
+            className="icon-button sidebar-toggle"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            title="Toggle sidebar"
+          >
+            <PanelLeftClose size={17} />
+          </button>
+        </div>
+
+        {sidebarOpen && <div className="workspace-label">WORKSPACE</div>}
+
+        <nav className="side-navigation">
+          {navigation.map(({ label, icon: Icon }) => (
+            <button
+              key={label}
+              className={`nav-item ${activePage === label ? 'active' : ''}`}
+              onClick={() => choosePage(label)}
+              title={label}
+            >
+              <Icon size={19} strokeWidth={1.8} />
+              {sidebarOpen && <span>{label}</span>}
+              {sidebarOpen && label === 'What-If Lab' && (
+                <span className="nav-badge">LAB</span>
+              )}
+            </button>
+          ))}
+        </nav>
+
+        {sidebarOpen && (
+          <>
+            <div className="sidebar-divider" />
+            <div className="workspace-label">QUICK ACCESS</div>
+            <div className="quick-access">
+              <button onClick={() => setSelectedModel('Neural Network')}>
+                <span className="quick-dot cyan-dot" />
+                Neural Network
+                <span className="quick-type">3D</span>
+              </button>
+              <button onClick={() => setSelectedModel('Atomic Structure')}>
+                <span className="quick-dot purple-dot" />
+                Atomic Structure
+                <span className="quick-type">3D</span>
+              </button>
+              <button onClick={() => setSelectedModel('Human Heart')}>
+                <span className="quick-dot pink-dot" />
+                Human Heart
+                <span className="quick-type">3D</span>
+              </button>
+            </div>
+
+            <div className="sidebar-bottom">
+              <div className="upgrade-card">
+                <div className="upgrade-icon">
+                  <Sparkles size={17} />
+                </div>
+                <strong>Learning, visualized.</strong>
+                <p>Turn complex concepts into interactive experiences.</p>
+              </div>
+              <button className="nav-item">
+                <Settings2 size={18} />
+                <span>Settings</span>
+              </button>
+              <button className="nav-item">
+                <CircleHelp size={18} />
+                <span>Help & Support</span>
+              </button>
+              <div className="user-card">
+                <div className="avatar">K</div>
+                <div className="user-info">
+                  <strong>Student Workspace</strong>
+                  <span>Free workspace</span>
+                </div>
+                <ChevronDown size={15} />
+              </div>
+            </div>
+          </>
+        )}
+      </aside>
+
+      <section className="main-area">
+        <header className="topbar">
+          <div className="breadcrumb">
+            <span>Workspace</span>
+            <span className="breadcrumb-slash">/</span>
+            <strong>{activePage}</strong>
+          </div>
+
+          <div className="topbar-actions">
+            <label className="global-search">
+              <Search size={16} />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search models..."
+                aria-label="Search models"
+              />
+              <kbd><Command size={10} /> K</kbd>
+            </label>
+            <button className="icon-button notification-button" title="Notifications">
+              <Bell size={18} />
+              <span />
+            </button>
+            <div className="top-avatar">K</div>
+          </div>
+        </header>
+
+        <div className="page-content">
+          <section className="welcome-section">
+            <div>
+              <div className="eyebrow">
+                <span className="live-dot" />
+                YOUR INTERACTIVE LEARNING SPACE
+              </div>
+              <h1>Understand the <span>unseen.</span></h1>
+              <p className="welcome-description">
+                Explore complex concepts in 3D. Interact, experiment, and
+                discover how things really work.
+              </p>
+            </div>
+            <button className="upload-button" onClick={() => document.getElementById('model-upload')?.click()}>
+              <Upload size={17} />
+              Upload a diagram
+            </button>
+            <input
+              id="model-upload"
+              type="file"
+              accept="image/*,.pdf"
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                if (file) {
+                  window.alert(`Selected: ${file.name}. Diagram analysis will be added in a later step.`)
+                }
+              }}
+            />
+          </section>
+
+          <section className="stats-row">
+            <div className="stat-card">
+              <div className="stat-icon cyan-bg"><Network size={19} /></div>
+              <div><span>MODEL LIBRARY</span><strong>04 <small>topics</small></strong></div>
+              <div className="stat-decoration">◈</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon purple-bg"><Rotate3D size={19} /></div>
+              <div><span>3D WORKSPACE</span><strong>Ready <small>to explore</small></strong></div>
+              <div className="stat-decoration">⌘</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon green-bg"><ShieldCheck size={19} /></div>
+              <div><span>LEARNING MODE</span><strong>Interactive</strong></div>
+              <div className="status-pill"><span /> Active</div>
+            </div>
+          </section>
+
+          <section className="explorer-heading">
+            <div>
+              <div className="section-eyebrow">YOUR WORKSPACE</div>
+              <h2>3D Model Explorer</h2>
+              <p>Select a concept to start exploring its structure.</p>
+            </div>
+            <button className="text-button" onClick={() => choosePage('Explore Models')}>
+              Browse library <span>↗</span>
+            </button>
+          </section>
+
+          <section className="explorer-layout">
+            <div className={`viewer-card ${isFullscreen ? "viewer-card-fullscreen" : ""}`} ref={setFullscreenElement}>
+              <div className="viewer-toolbar">
+                <div className="model-selector-wrap">
+                  <button
+                    className="model-selector"
+                    onClick={() => setShowModelMenu(!showModelMenu)}
+                  >
+                    <currentModel.icon size={18} />
+                    <span>{selectedModel}</span>
+                    <ChevronDown size={15} />
+                  </button>
+                  {showModelMenu && (
+                    <div className="model-dropdown">
+                      {models.map((model) => {
+                        const Icon = model.icon
+                        return (
+                          <button
+                            key={model.name}
+                            onClick={() => {
+                              setSelectedModel(model.name)
+                              setShowModelMenu(false)
+                            }}
+                          >
+                            <Icon size={17} />
+                            <span>{model.name}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+                <div className="viewer-tools">
+                  <button
+                    type="button"
+                    className={`viewer-tool ${showModelInformation ? 'tool-active' : ''}`}
+                    onClick={() => setShowModelInformation((open) => !open)}
+                    title="View model information"
+                    aria-label="View model information"
+                    aria-expanded={showModelInformation}
+                  >
+                    <Info size={16} />
+                    <span>Information</span>
+                  </button>
+                  <span className="tool-divider" />
+                  <button
+                    className={`viewer-tool ${showLabels ? 'tool-active' : ''}`}
+                    onClick={() => setShowLabels(!showLabels)}
+                    title="Toggle labels"
+                  >
+                    <Eye size={16} />
+                    <span>Labels</span>
+                  </button>
+                  <span className="tool-divider" />
+                  <button
+                    className="icon-button"
+                    title="Zoom in"
+                    aria-label="Zoom in"
+                    onClick={() => {
+                      setZoomCommand({
+                        direction: 'in',
+                        id: Date.now(),
+                      })
+                    }}
+                  >
+                    <ZoomIn size={17} />
+                  </button>
+                  <button
+                    className="icon-button"
+                    title="Zoom out"
+                    aria-label="Zoom out"
+                    onClick={() => {
+                      setZoomCommand({
+                        direction: 'out',
+                        id: Date.now(),
+                      })
+                    }}
+                  >
+                    <ZoomOut size={17} />
+                  </button>
+                  <button
+                    className="icon-button fullscreen-toggle"
+                    title={isFullscreen ? "Exit full screen (Esc)" : "Analyze diagram full screen"}
+                    aria-label={isFullscreen ? "Exit full screen" : "Analyze diagram full screen"}
+                    onClick={async () => {
+                      if (!fullscreenElement) return
+                      try {
+                        if (document.fullscreenElement) {
+                          await document.exitFullscreen()
+                        } else {
+                          await fullscreenElement.requestFullscreen()
+                        }
+                      } catch (error) {
+                        console.error("Fullscreen could not be opened:", error)
+                      }
+                    }}
+                  >
+                    {isFullscreen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+                  </button>
+                  <button
+                    className={`icon-button ${showViewerSettings ? 'tool-active' : ''}`}
+                    title="View settings"
+                    aria-label="Toggle viewer settings"
+                    onClick={() => setShowViewerSettings((visible) => !visible)}
+                  >
+                    <Settings2 size={17} />
+                  </button>
+                </div>
+              </div>
+
+              <div className={`viewer-canvas actual-3d-canvas viewer-mode-${viewerDisplayMode}`}>
+                {showViewerSettings && (
+                  <div className="viewer-settings-popover">
+                    <div className="viewer-settings-heading">
+                      <strong>Viewer settings</strong>
+                      <button
+                        className="icon-button"
+                        onClick={() => setShowViewerSettings(false)}
+                        aria-label="Close viewer settings"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <div className="viewer-display-mode">
+                      <span className="viewer-display-mode-label">Display mode</span>
+                      <div className="viewer-display-mode-options">
+                        <button
+                          className={`display-mode-button ${viewerDisplayMode === 'default' ? 'display-mode-active' : ''}`}
+                          title="Default holographic background"
+                          aria-label="Default display mode"
+                          aria-pressed={viewerDisplayMode === 'default'}
+                          onClick={() => setViewerDisplayMode('default')}
+                        >
+                          ☀
+                        </button>
+                        <button
+                          className={`display-mode-button ${viewerDisplayMode === 'dark' ? 'display-mode-active' : ''}`}
+                          title="Dark mode"
+                          aria-label="Dark display mode"
+                          aria-pressed={viewerDisplayMode === 'dark'}
+                          onClick={() => setViewerDisplayMode('dark')}
+                        >
+                          ☾
+                        </button>
+                        <button
+                          className={`display-mode-button ${viewerDisplayMode === 'glass' ? 'display-mode-active' : ''}`}
+                          title="Transparent glass mode"
+                          aria-label="Glass display mode"
+                          aria-pressed={viewerDisplayMode === 'glass'}
+                          onClick={() => setViewerDisplayMode('glass')}
+                        >
+                          ◇
+                        </button>
+                      </div>
+                    </div>
+                    <label className="viewer-setting-row">
+                      <span>Neuron labels</span>
+                      <input
+                        type="checkbox"
+                        checked={showLabels}
+                        onChange={() => setShowLabels((visible) => !visible)}
+                      />
+                    </label>
+                    <p>Explore your model by selecting a component to understand its function and role in the overall system.</p>
+                  </div>
+                )}
+                <div className="viewer-rotation-controls">
+                  <button
+                    className="rotation-button"
+                    title="Top view"
+                    aria-label="Top view"
+                    onClick={() => setRotationCommand({ direction: 'up', id: Date.now() })}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    className="rotation-button"
+                    title="Bottom view"
+                    aria-label="Bottom view"
+                    onClick={() => setRotationCommand({ direction: 'down', id: Date.now() })}
+                  >
+                    ↓
+                  </button>
+                  <button
+                    className="rotation-button"
+                    title="Left view"
+                    aria-label="Left view"
+                    onClick={() => setRotationCommand({ direction: 'left', id: Date.now() })}
+                  >
+                    ←
+                  </button>
+                  <button
+                    className="rotation-button"
+                    title="Right view"
+                    aria-label="Right view"
+                    onClick={() => setRotationCommand({ direction: 'right', id: Date.now() })}
+                  >
+                    →
+                  </button>
+                  <button
+                    className="rotation-button"
+                    title="Reset to default view"
+                    aria-label="Reset to default view"
+                    onClick={() => {
+                      setAutoRotate(false)
+                      setSelectedNeuron(null)
+                      setRotationCommand({ direction: 'reset', id: Date.now() })
+                    }}
+                  >
+                    ⌂
+                  </button>
+                  <button
+                    className={`rotation-button rotation-toggle ${autoRotate ? 'rotation-active' : ''}`}
+                    title={autoRotate ? 'Stop rotation' : 'Start 360° rotation'}
+                    aria-label={autoRotate ? 'Stop rotation' : 'Start 360 degree rotation'}
+                    aria-pressed={autoRotate}
+                    onClick={() => setAutoRotate((rotating) => !rotating)}
+                  >
+                    ⟳
+                  </button>
+                  <button
+                    type="button"
+                    className={`rotation-button rotation-toggle ${atomicSimulationOn ? 'rotation-active' : ''}`}
+                    title={atomicSimulationOn ? 'Pause simulation' : 'Start simulation'}
+                    aria-label={atomicSimulationOn ? 'Pause simulation' : 'Start simulation'}
+                    aria-pressed={atomicSimulationOn}
+                    onClick={() => setAtomicSimulationOn((running) => !running)}
+                  >
+                    {atomicSimulationOn ? '⏸' : '▶'}
+                  </button>
+                </div>
+
+                <div className="canvas-top-label">
+                  <span className="canvas-live-dot" />
+                  INTERACTIVE 3D VIEW
+                </div>
+
+                {selectedModel === 'Neural Network' ? (
+                  <NeuralNetwork3D
+                    showLabels={showLabels}
+                    onSelectNeuron={setSelectedNeuron}
+                    zoomCommand={zoomCommand}
+                    onZoomComplete={() => setZoomCommand(null)}
+                    rotationCommand={rotationCommand}
+                    autoRotate={autoRotate}
+                    simulationOn={atomicSimulationOn}
+                    displayMode={viewerDisplayMode}
+                  />
+                ) : selectedModel === 'Atomic Structure' ? (
+                  <div className="atomic-workspace">
+                    <div className="atomic-element-toolbar atomic-element-toolbar-compact">
+                      <div className="atomic-element-summary">
+                        <strong className="atomic-element-symbol">{selectedElement.symbol}</strong>
+                        <div>
+                          <strong>{selectedElement.name}</strong>
+                          <span>Atomic number: {selectedElement.atomicNumber} · {Math.max(0, selectedElement.atomicNumber - ionCharge)} electrons</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="atomic-select-element-button"
+                        onClick={() => {
+                          setPendingElementNumber(selectedElementNumber)
+                          setShowElementPicker(true)
+                        }}
+                      >
+                        <Atom size={16} />
+                        Select Element
+                      </button>
+                    </div>
+
+                    {showElementPicker && (
+                      <div
+                        className="atomic-dialog-backdrop"
+                        role="presentation"
+                        onMouseDown={(event) => {
+                          if (event.target === event.currentTarget) setShowElementPicker(false)
+                        }}
+                      >
+                        <section
+                          className="atomic-element-dialog"
+                          role="dialog"
+                          aria-modal="true"
+                          aria-labelledby="atomic-dialog-title"
+                        >
+                          <div className="atomic-dialog-heading">
+                            <div>
+                              <span>CHEMISTRY EXPLORER</span>
+                              <h2 id="atomic-dialog-title">Select an element</h2>
+                            </div>
+                            <button
+                              type="button"
+                              className="icon-button"
+                              aria-label="Close element selection"
+                              onClick={() => setShowElementPicker(false)}
+                            >
+                              ×
+                            </button>
+                          </div>
+
+                          <label htmlFor="atomic-element-select">Element</label>
+                          <select
+                            id="atomic-element-select"
+                            value={pendingElementNumber}
+                            onChange={(event) => setPendingElementNumber(Number(event.target.value))}
+                            autoFocus
+                          >
+                            {ELEMENTS.map((element) => (
+                              <option key={element.atomicNumber} value={element.atomicNumber}>
+                                {element.atomicNumber}. {element.name} ({element.symbol})
+                              </option>
+                            ))}
+                          </select>
+
+                          <label htmlFor="atomic-charge-select">Ion charge</label>
+                          <select
+                            id="atomic-charge-select"
+                            value={ionCharge}
+                            onChange={(event) => setIonCharge(Number(event.target.value))}
+                          >
+                            <option value={0}>Neutral atom (0)</option>
+                            <option value={1}>Positive ion (+1)</option>
+                            <option value={-1}>Negative ion (−1)</option>
+                          </select>
+
+                          <div className="atomic-dialog-preview">
+                            <strong>{ELEMENTS.find((element) => element.atomicNumber === pendingElementNumber)?.symbol}</strong>
+                            <div>
+                              <b>{ELEMENTS.find((element) => element.atomicNumber === pendingElementNumber)?.name}</b>
+                              <span>Atomic number: {pendingElementNumber}</span>
+                            </div>
+                          </div>
+
+                          <div className="atomic-dialog-actions">
+                            <button
+                              type="button"
+                              className="atomic-dialog-cancel"
+                              onClick={() => setShowElementPicker(false)}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              className="atomic-dialog-confirm"
+                              onClick={() => {
+                                setSelectedElementNumber(pendingElementNumber)
+                                setShowElementPicker(false)
+                              }}
+                            >
+                              OK · Apply element
+                            </button>
+                          </div>
+                        </section>
+                      </div>
+                    )}
+
+                    <AtomicStructure3D
+                      element={selectedElement}
+                      ionCharge={ionCharge}
+                      showLabels={showLabels}
+                      autoRotate={autoRotate}
+                      simulationOn={atomicSimulationOn}
+                      displayMode={viewerDisplayMode}
+                      zoomCommand={zoomCommand}
+                      onZoomComplete={() => setZoomCommand(null)}
+                      rotationCommand={rotationCommand}
+                      onElectronSelect={setSelectedElectron}
+                    />
+
+                    {isFullscreen && (
+                      <section
+                        className="atomic-fullscreen-electron-panel"
+                        aria-live="polite"
+                        style={{
+                          position: 'absolute',
+                          left: 20,
+                          top: 90,
+                          zIndex: 1000,
+                          width: 'min(300px, calc(100% - 32px))',
+                          maxHeight: '45%',
+                          overflowY: 'auto',
+                          padding: 16,
+                          border: '1px solid rgba(93, 205, 255, 0.45)',
+                          borderRadius: 14,
+                          background: 'rgba(5, 18, 36, 0.94)',
+                          color: '#eef7ff',
+                          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.35)',
+                          backdropFilter: 'blur(14px)',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: 12,
+                            marginBottom: 12,
+                          }}
+                        >
+                          <div>
+                            <span
+                              style={{
+                                display: 'block',
+                                fontSize: 10,
+                                letterSpacing: 1.5,
+                                color: '#65d5ff',
+                                marginBottom: 4,
+                              }}
+                            >
+                              ELECTRON INSPECTOR
+                            </span>
+                            <strong>
+                              {selectedElectron
+                                ? `Electron ${selectedElectron.number}`
+                                : 'Select an electron'}
+                            </strong>
+                          </div>
+                          {selectedElectron && (
+                            <span style={{ fontSize: 24, color: '#65d5ff' }}>e⁻</span>
+                          )}
+                        </div>
+
+                        {selectedElectron ? (
+                          <div style={{ display: 'grid', gap: 9, fontSize: 13 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                              <span>Electron number</span>
+                              <strong>{selectedElectron.number}</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                              <span>Shell</span>
+                              <strong>{selectedElectron.shell}</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                              <span>Charge</span>
+                              <strong>−1e</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                              <span>Charge (C)</span>
+                              <strong>−1.602 × 10⁻¹⁹ C</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                              <span>Rest mass</span>
+                              <strong>9.109 × 10⁻³¹ kg</strong>
+                            </div>
+                            <div
+                              style={{
+                                marginTop: 4,
+                                paddingTop: 10,
+                                borderTop: '1px solid rgba(150, 200, 230, 0.2)',
+                                color: '#a9c4d9',
+                                lineHeight: 1.5,
+                              }}
+                            >
+                              This electron belongs to the {selectedElectron.shell}
+                              {selectedElectron.shell === 1 ? 'st' : selectedElectron.shell === 2 ? 'nd' : selectedElectron.shell === 3 ? 'rd' : 'th'}
+                              electron shell of {selectedElement.name}.
+                            </div>
+                          </div>
+                        ) : (
+                          <p style={{ margin: 0, fontSize: 12, lineHeight: 1.6, color: '#a9c4d9' }}>
+                            Click a glowing electron in the 3D atom to inspect its shell,
+                            charge and physical properties.
+                          </p>
+                        )}
+                      </section>
+                    )}
+                  </div>
+                ) : selectedModel === 'Human Heart' ? (
+                  <HumanHeart3D
+                    showLabels={showLabels}
+                    autoRotate={autoRotate}
+                    simulationOn={atomicSimulationOn}
+                    displayMode={viewerDisplayMode}
+                    zoomCommand={zoomCommand}
+                    onZoomComplete={() => setZoomCommand(null)}
+                    rotationCommand={rotationCommand}
+                  />
+                ) : selectedModel === 'Computer Architecture' ? (
+                  <ComputerArchitecture3D
+                    showLabels={showLabels}
+                    autoRotate={autoRotate}
+                    simulationOn={atomicSimulationOn}
+                    displayMode={viewerDisplayMode}
+                    zoomCommand={zoomCommand}
+                    onZoomComplete={() => setZoomCommand(null)}
+                    rotationCommand={rotationCommand}
+                  />
+                ) : (
+                  <div className="model-coming-soon">
+                    <currentModel.icon size={42} strokeWidth={1.3} />
+                    <strong>{currentModel.name}</strong>
+                    <span>This model will be implemented in a later step.</span>
+                    <button onClick={() => setSelectedModel('Neural Network')}>
+                      Open Neural Network
+                    </button>
+                  </div>
+                )}
+
+                {showModelInformation && (
+                  <section
+                    role="dialog"
+                    aria-label={`${selectedModel} information`}
+                    className="model-information-panel"
+                    style={{
+                      position: 'absolute',
+                      top: 58,
+                      right: 16,
+                      zIndex: 1200,
+                      width: 'min(390px, calc(100% - 32px))',
+                      maxHeight: 'calc(100% - 100px)',
+                      overflowY: 'auto',
+                      padding: 20,
+                      border: '1px solid rgba(93, 205, 255, 0.4)',
+                      borderRadius: 16,
+                      background: 'rgba(5, 17, 35, 0.97)',
+                      color: '#eef7ff',
+                      boxShadow: '0 12px 40px rgba(0,0,0,0.38)',
+                      backdropFilter: 'blur(16px)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 18 }}>
+                      <div>
+                        <span style={{ fontSize: 10, letterSpacing: 1.6, color: '#65d5ff' }}>
+                          HOLOSTUDY AI · MODEL GUIDE
+                        </span>
+                        <h2 style={{ margin: '6px 0 0', fontSize: 21 }}>{selectedModel}</h2>
+                        <p style={{ margin: '5px 0 0', fontSize: 12, lineHeight: 1.5, color: '#a9c4d9' }}>
+                          {currentModel.description}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        aria-label="Close information panel"
+                        title="Close information"
+                        onClick={() => setShowModelInformation(false)}
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    {selectedModel === 'Atomic Structure' ? (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 14, borderRadius: 12, background: 'rgba(75, 195, 255, 0.09)', marginBottom: 16 }}>
+                          <strong style={{ fontSize: 38, color: '#65d5ff' }}>{selectedElement.symbol}</strong>
+                          <div>
+                            <strong style={{ display: 'block', fontSize: 17 }}>{selectedElement.name}</strong>
+                            <span style={{ fontSize: 12, color: '#a9c4d9' }}>{selectedElement.category}</span>
+                            <div style={{ fontSize: 11, marginTop: 4 }}>Atomic number {selectedElement.atomicNumber}</div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 9 }}>
+                          {[
+                            ['Atomic mass', selectedElement.atomicMass == null ? 'Unknown' : `${selectedElement.atomicMass} u`],
+                            ['Protons', String(selectedElement.atomicNumber)],
+                            ['Electrons', String(Math.max(0, selectedElement.atomicNumber - ionCharge))],
+                            ['Neutrons (estimated)', selectedElement.commonMassNumber == null ? 'Unknown' : String(Math.max(0, selectedElement.commonMassNumber - selectedElement.atomicNumber))],
+                            ['Group', selectedElement.group == null ? 'Lanthanide / actinide series' : String(selectedElement.group)],
+                            ['Period', String(selectedElement.period)],
+                            ['Block', /[spdf]/.test(selectedElement.electronConfiguration.replace(/^.*\]\s*/, '').slice(-2, -1)) ? selectedElement.electronConfiguration.replace(/^.*\]\s*/, '').match(/[spdf]/g)?.slice(-1)[0]?.toUpperCase() + '-block' : 'See configuration'],
+                            ['Ion charge', ionCharge > 0 ? `+${ionCharge}` : String(ionCharge)],
+                            ['Occupied shells', String(selectedElement.shells.filter((count) => count > 0).length)],
+                            ['Valence electrons (neutral)', String(selectedElement.shells[selectedElement.period - 1] ?? 0)],
+                          ].map(([label, value]) => (
+                            <div key={label} style={{ minWidth: 0, padding: 11, borderRadius: 9, border: '1px solid rgba(115,205,255,0.18)', background: 'rgba(66,207,255,0.045)' }}>
+                              <div style={{ fontSize: 10, color: '#a9c4d9', marginBottom: 5 }}>{label}</div>
+                              <strong style={{ fontSize: 13, overflowWrap: 'anywhere' }}>{value}</strong>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div style={{ marginTop: 18 }}>
+                          <h3 style={{ fontSize: 14, margin: '0 0 8px' }}>Electronic configuration</h3>
+                          <div style={{ padding: 12, borderRadius: 9, background: 'rgba(75,195,255,0.09)', color: '#8fe2ff', overflowWrap: 'anywhere', fontSize: 14 }}>
+                            {selectedElement.electronConfiguration.replace(/([spdf])(\d+)/g, '$1$2')}
+                          </div>
+                          <p style={{ fontSize: 11, color: '#a9c4d9', lineHeight: 1.6, margin: '8px 0 0' }}>
+                            Configuration above is for the neutral atom. Current ion electron count is shown separately. For ions, subshell occupancy can change; transition-metal ions may lose outer s electrons before d electrons.
+                          </p>
+                        </div>
+
+                        <div style={{ marginTop: 16 }}>
+                          <h3 style={{ fontSize: 14, margin: '0 0 8px' }}>Shell distribution</h3>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+                            {selectedElement.shells.map((count, index) => (
+                              <span key={index} style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(93,205,255,0.25)', fontSize: 12 }}>
+                                {['K','L','M','N','O','P','Q'][index] ?? `Shell ${index + 1}`}: {count}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div style={{ marginTop: 16 }}>
+                          <h3 style={{ fontSize: 14, margin: '0 0 8px' }}>Nuclear structure & isotope</h3>
+                          <p style={{ fontSize: 12, color: '#c4d8e8', lineHeight: 1.7, margin: 0 }}>
+                            Atomic number identifies the element and equals its proton count. The displayed neutron count is estimated from the database's common mass number; isotopes of this element can have different neutron counts.
+                          </p>
+                        </div>
+
+                        <div style={{ marginTop: 16 }}>
+                          <h3 style={{ fontSize: 14, margin: '0 0 8px' }}>Chemical overview</h3>
+                          <p style={{ fontSize: 12, color: '#c4d8e8', lineHeight: 1.7, margin: 0 }}>
+                            Category: {selectedElement.category}. Group and period describe the element's position in the periodic table and help explain trends in valence electrons and chemical behaviour. Specific oxidation states and reactivity depend on the element and its compounds.
+                          </p>
+                        </div>
+                      </>
+                    ) : selectedModel === 'Neural Network' ? (
+                      <>
+                        {[
+                          ['Architecture', 'Layered computational model'],
+                          ['Input layer', 'Receives features or input values'],
+                          ['Hidden layers', 'Learn intermediate representations'],
+                          ['Output layer', 'Produces prediction or classification'],
+                          ['Neuron', 'Computes a weighted sum plus bias, then applies an activation function'],
+                          ['Weights', 'Trainable parameters that scale connections'],
+                          ['Biases', 'Trainable offsets applied to neuron inputs'],
+                          ['Forward propagation', 'Passes values through the network to calculate outputs'],
+                          ['Training', 'Typically adjusts parameters using a loss function and gradient-based optimization'],
+                        ].map(([label, value]) => (
+                          <div key={label} style={{ padding: '11px 0', borderBottom: '1px solid rgba(115,205,255,0.15)' }}>
+                            <strong style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>{label}</strong>
+                            <span style={{ fontSize: 12, lineHeight: 1.6, color: '#a9c4d9' }}>{value}</span>
+                          </div>
+                        ))}
+                        <p style={{ fontSize: 11, color: '#a9c4d9', lineHeight: 1.6, marginTop: 12 }}>
+                          Select a neuron in the 3D view to inspect its connection details.
+                        </p>
+                      </>
+                    ) : selectedModel === 'Human Heart' ? (
+                      <>
+                        {[
+                          ['Primary function', 'Pumps blood through the pulmonary and systemic circulations'],
+                          ['Four chambers', 'Right atrium, right ventricle, left atrium and left ventricle'],
+                          ['Valves', 'Tricuspid, pulmonary, mitral and aortic valves help maintain one-way flow'],
+                          ['Pulmonary circulation', 'Moves blood between the heart and lungs'],
+                          ['Systemic circulation', 'Moves blood between the heart and the body'],
+                          ['Electrical conduction', 'SA node, AV node, bundle branches and Purkinje fibres coordinate contractions'],
+                        ].map(([label, value]) => (
+                          <div key={label} style={{ padding: '11px 0', borderBottom: '1px solid rgba(115,205,255,0.15)' }}>
+                            <strong style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>{label}</strong>
+                            <span style={{ fontSize: 12, lineHeight: 1.6, color: '#a9c4d9' }}>{value}</span>
+                          </div>
+                        ))}
+                      </>
+                    ) : selectedModel === 'Computer Architecture' ? (
+                      <>
+                        {[
+                          ['CPU', 'Executes instructions and coordinates processing'],
+                          ['ALU', 'Performs arithmetic and logical operations'],
+                          ['Control unit', 'Coordinates instruction execution'],
+                          ['Registers', 'Provide small, fast storage inside the processor'],
+                          ['Memory', 'Stores instructions and data for active tasks'],
+                          ['Input / output', 'Moves information between the computer and external devices'],
+                          ['Instruction cycle', 'Fetch, decode, execute and store results'],
+                        ].map(([label, value]) => (
+                          <div key={label} style={{ padding: '11px 0', borderBottom: '1px solid rgba(115,205,255,0.15)' }}>
+                            <strong style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>{label}</strong>
+                            <span style={{ fontSize: 12, lineHeight: 1.6, color: '#a9c4d9' }}>{value}</span>
+                          </div>
+                        ))}
+                      </>
+                    ) : (
+                      <p style={{ fontSize: 13, color: '#c4d8e8', lineHeight: 1.7 }}>
+                        {currentModel.description} Detailed information for this model can be added as its interactive 3D implementation becomes available.
+                      </p>
+                    )}
+                  </section>
+                )}
+
+                {showModelInformation && (
+                  <section
+                    role="dialog"
+                    aria-label={`${selectedModel} information`}
+                    className="model-information-panel"
+                    style={{
+                      position: 'absolute',
+                      top: 58,
+                      right: 16,
+                      zIndex: 1200,
+                      width: 'min(390px, calc(100% - 32px))',
+                      maxHeight: 'calc(100% - 100px)',
+                      overflowY: 'auto',
+                      padding: 20,
+                      border: '1px solid rgba(93, 205, 255, 0.4)',
+                      borderRadius: 16,
+                      background: 'rgba(5, 17, 35, 0.97)',
+                      color: '#eef7ff',
+                      boxShadow: '0 12px 40px rgba(0,0,0,0.38)',
+                      backdropFilter: 'blur(16px)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 18 }}>
+                      <div>
+                        <span style={{ fontSize: 10, letterSpacing: 1.6, color: '#65d5ff' }}>
+                          HOLOSTUDY AI · MODEL GUIDE
+                        </span>
+                        <h2 style={{ margin: '6px 0 0', fontSize: 21 }}>{selectedModel}</h2>
+                        <p style={{ margin: '5px 0 0', fontSize: 12, lineHeight: 1.5, color: '#a9c4d9' }}>
+                          {currentModel.description}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        aria-label="Close information panel"
+                        title="Close information"
+                        onClick={() => setShowModelInformation(false)}
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    {selectedModel === 'Atomic Structure' ? (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 14, borderRadius: 12, background: 'rgba(75, 195, 255, 0.09)', marginBottom: 16 }}>
+                          <strong style={{ fontSize: 38, color: '#65d5ff' }}>{selectedElement.symbol}</strong>
+                          <div>
+                            <strong style={{ display: 'block', fontSize: 17 }}>{selectedElement.name}</strong>
+                            <span style={{ fontSize: 12, color: '#a9c4d9' }}>{selectedElement.category}</span>
+                            <div style={{ fontSize: 11, marginTop: 4 }}>Atomic number {selectedElement.atomicNumber}</div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 9 }}>
+                          {[
+                            ['Atomic mass', selectedElement.atomicMass == null ? 'Unknown' : `${selectedElement.atomicMass} u`],
+                            ['Protons', String(selectedElement.atomicNumber)],
+                            ['Electrons', String(Math.max(0, selectedElement.atomicNumber - ionCharge))],
+                            ['Neutrons (estimated)', selectedElement.commonMassNumber == null ? 'Unknown' : String(Math.max(0, selectedElement.commonMassNumber - selectedElement.atomicNumber))],
+                            ['Group', selectedElement.group == null ? 'Lanthanide / actinide series' : String(selectedElement.group)],
+                            ['Period', String(selectedElement.period)],
+                            ['Block', /[spdf]/.test(selectedElement.electronConfiguration.replace(/^.*\]\s*/, '').slice(-2, -1)) ? selectedElement.electronConfiguration.replace(/^.*\]\s*/, '').match(/[spdf]/g)?.slice(-1)[0]?.toUpperCase() + '-block' : 'See configuration'],
+                            ['Ion charge', ionCharge > 0 ? `+${ionCharge}` : String(ionCharge)],
+                            ['Occupied shells', String(selectedElement.shells.filter((count) => count > 0).length)],
+                            ['Valence electrons (neutral)', String(selectedElement.shells[selectedElement.period - 1] ?? 0)],
+                          ].map(([label, value]) => (
+                            <div key={label} style={{ minWidth: 0, padding: 11, borderRadius: 9, border: '1px solid rgba(115,205,255,0.18)', background: 'rgba(66,207,255,0.045)' }}>
+                              <div style={{ fontSize: 10, color: '#a9c4d9', marginBottom: 5 }}>{label}</div>
+                              <strong style={{ fontSize: 13, overflowWrap: 'anywhere' }}>{value}</strong>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div style={{ marginTop: 18 }}>
+                          <h3 style={{ fontSize: 14, margin: '0 0 8px' }}>Electronic configuration</h3>
+                          <div style={{ padding: 12, borderRadius: 9, background: 'rgba(75,195,255,0.09)', color: '#8fe2ff', overflowWrap: 'anywhere', fontSize: 14 }}>
+                            {selectedElement.electronConfiguration.replace(/([spdf])(\d+)/g, '$1$2')}
+                          </div>
+                          <p style={{ fontSize: 11, color: '#a9c4d9', lineHeight: 1.6, margin: '8px 0 0' }}>
+                            Configuration above is for the neutral atom. Current ion electron count is shown separately. For ions, subshell occupancy can change; transition-metal ions may lose outer s electrons before d electrons.
+                          </p>
+                        </div>
+
+                        <div style={{ marginTop: 16 }}>
+                          <h3 style={{ fontSize: 14, margin: '0 0 8px' }}>Shell distribution</h3>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+                            {selectedElement.shells.map((count, index) => (
+                              <span key={index} style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(93,205,255,0.25)', fontSize: 12 }}>
+                                {['K','L','M','N','O','P','Q'][index] ?? `Shell ${index + 1}`}: {count}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div style={{ marginTop: 16 }}>
+                          <h3 style={{ fontSize: 14, margin: '0 0 8px' }}>Nuclear structure & isotope</h3>
+                          <p style={{ fontSize: 12, color: '#c4d8e8', lineHeight: 1.7, margin: 0 }}>
+                            Atomic number identifies the element and equals its proton count. The displayed neutron count is estimated from the database's common mass number; isotopes of this element can have different neutron counts.
+                          </p>
+                        </div>
+
+                        <div style={{ marginTop: 16 }}>
+                          <h3 style={{ fontSize: 14, margin: '0 0 8px' }}>Chemical overview</h3>
+                          <p style={{ fontSize: 12, color: '#c4d8e8', lineHeight: 1.7, margin: 0 }}>
+                            Category: {selectedElement.category}. Group and period describe the element's position in the periodic table and help explain trends in valence electrons and chemical behaviour. Specific oxidation states and reactivity depend on the element and its compounds.
+                          </p>
+                        </div>
+                      </>
+                    ) : selectedModel === 'Neural Network' ? (
+                      <>
+                        {[
+                          ['Architecture', 'Layered computational model'],
+                          ['Input layer', 'Receives features or input values'],
+                          ['Hidden layers', 'Learn intermediate representations'],
+                          ['Output layer', 'Produces prediction or classification'],
+                          ['Neuron', 'Computes a weighted sum plus bias, then applies an activation function'],
+                          ['Weights', 'Trainable parameters that scale connections'],
+                          ['Biases', 'Trainable offsets applied to neuron inputs'],
+                          ['Forward propagation', 'Passes values through the network to calculate outputs'],
+                          ['Training', 'Typically adjusts parameters using a loss function and gradient-based optimization'],
+                        ].map(([label, value]) => (
+                          <div key={label} style={{ padding: '11px 0', borderBottom: '1px solid rgba(115,205,255,0.15)' }}>
+                            <strong style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>{label}</strong>
+                            <span style={{ fontSize: 12, lineHeight: 1.6, color: '#a9c4d9' }}>{value}</span>
+                          </div>
+                        ))}
+                        <p style={{ fontSize: 11, color: '#a9c4d9', lineHeight: 1.6, marginTop: 12 }}>
+                          Select a neuron in the 3D view to inspect its connection details.
+                        </p>
+                      </>
+                    ) : selectedModel === 'Human Heart' ? (
+                      <>
+                        {[
+                          ['Primary function', 'Pumps blood through the pulmonary and systemic circulations'],
+                          ['Four chambers', 'Right atrium, right ventricle, left atrium and left ventricle'],
+                          ['Valves', 'Tricuspid, pulmonary, mitral and aortic valves help maintain one-way flow'],
+                          ['Pulmonary circulation', 'Moves blood between the heart and lungs'],
+                          ['Systemic circulation', 'Moves blood between the heart and the body'],
+                          ['Electrical conduction', 'SA node, AV node, bundle branches and Purkinje fibres coordinate contractions'],
+                        ].map(([label, value]) => (
+                          <div key={label} style={{ padding: '11px 0', borderBottom: '1px solid rgba(115,205,255,0.15)' }}>
+                            <strong style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>{label}</strong>
+                            <span style={{ fontSize: 12, lineHeight: 1.6, color: '#a9c4d9' }}>{value}</span>
+                          </div>
+                        ))}
+                      </>
+                    ) : selectedModel === 'Computer Architecture' ? (
+                      <>
+                        {[
+                          ['CPU', 'Executes instructions and coordinates processing'],
+                          ['ALU', 'Performs arithmetic and logical operations'],
+                          ['Control unit', 'Coordinates instruction execution'],
+                          ['Registers', 'Provide small, fast storage inside the processor'],
+                          ['Memory', 'Stores instructions and data for active tasks'],
+                          ['Input / output', 'Moves information between the computer and external devices'],
+                          ['Instruction cycle', 'Fetch, decode, execute and store results'],
+                        ].map(([label, value]) => (
+                          <div key={label} style={{ padding: '11px 0', borderBottom: '1px solid rgba(115,205,255,0.15)' }}>
+                            <strong style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>{label}</strong>
+                            <span style={{ fontSize: 12, lineHeight: 1.6, color: '#a9c4d9' }}>{value}</span>
+                          </div>
+                        ))}
+                      </>
+                    ) : (
+                      <p style={{ fontSize: 13, color: '#c4d8e8', lineHeight: 1.7 }}>
+                        {currentModel.description} Detailed information for this model can be added as its interactive 3D implementation becomes available.
+                      </p>
+                    )}
+                  </section>
+                )}
+
+                <div className="canvas-instructions">
+                  <Rotate3D size={15} />
+
+                </div>
+
+                <div className="canvas-bottom-left">
+                  <span className="coordinate-dot" />
+                  PERSPECTIVE VIEW
+                </div>
+                <div className="canvas-bottom-right">
+                  <span>X</span><span>Y</span><span>Z</span>
+                </div>
+              </div>
+
+              <div className="viewer-footer">
+                <div className="viewer-footer-left">
+                  <span className="render-indicator" />
+                  <span>Interactive 3D workspace</span>
+                  <span className="footer-separator">/</span>
+                  <span className="muted">{selectedModel}</span>
+                </div>
+                <div className="viewer-footer-right">
+                  <span>GRID</span>
+                  <span className="grid-status">ON</span>
+                </div>
+              </div>
+            </div>
+
+            <aside className={`properties-panel inspector-width-${inspectorWidth} inspector-text-${inspectorTextSize}`}>
+              <div className="panel-heading">
+                <div>
+                  <span className="section-eyebrow">INSPECTOR</span>
+                  <h3>Model details</h3>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    title="View full model details"
+                    aria-label="View full model details"
+                    onClick={() => setInspectorDetailFullscreen(true)}
+                  >
+                    <Maximize2 size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    title="Inspector settings"
+                    aria-label="Inspector settings"
+                    aria-expanded={showInspectorSettings}
+                    onClick={() => setShowInspectorSettings((open) => !open)}
+                  >
+                    <Settings2 size={17} />
+                  </button>
+                </div>
+              </div>
+
+              {showInspectorSettings && (
+                <section className="inspector-settings-panel" aria-label="Inspector display settings">
+                  <div className="inspector-settings-heading">
+                    <strong>Display settings</strong>
+                    <button
+                      type="button"
+                      className="inspector-reset-button"
+                      onClick={() => {
+                        setInspectorWidth('default')
+                        setInspectorTextSize('medium')
+                        setShowDetailedProperties(true)
+                      }}
+                    >
+                      Reset
+                    </button>
+                  </div>
+
+                  <label htmlFor="inspector-width">Panel width</label>
+                  <select
+                    id="inspector-width"
+                    value={inspectorWidth}
+                    onChange={(event) => setInspectorWidth(event.target.value as 'compact' | 'default' | 'wide')}
+                  >
+                    <option value="compact">Compact</option>
+                    <option value="default">Default</option>
+                    <option value="wide">Wide</option>
+                  </select>
+
+                  <label htmlFor="inspector-text-size">Text size</label>
+                  <select
+                    id="inspector-text-size"
+                    value={inspectorTextSize}
+                    onChange={(event) => setInspectorTextSize(event.target.value as 'small' | 'medium' | 'large')}
+                  >
+                    <option value="small">Small</option>
+                    <option value="medium">Medium</option>
+                    <option value="large">Large</option>
+                  </select>
+
+                  <label className="inspector-detail-toggle">
+                    <input
+                      type="checkbox"
+                      checked={showDetailedProperties}
+                      onChange={(event) => setShowDetailedProperties(event.target.checked)}
+                    />
+                    <span>Show detailed properties</span>
+                  </label>
+                </section>
+              )}
+
+              <div className="model-preview-icon">
+                <div className="preview-icon-inner">
+                  <currentModel.icon size={32} strokeWidth={1.5} />
+                </div>
+                <div className="preview-model-name">
+                  <strong>{currentModel.name}</strong>
+                  <span>{currentModel.category}</span>
+                </div>
+              </div>
+
+              <p className="model-description">{currentModel.description}</p>
+
+              <div className="panel-divider" />
+
+              {selectedModel === 'Atomic Structure' ? (
+                <>
+                  <section className="atomic-electron-inspector" style={{ marginBottom: 18 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
+                      <div className="property-section-title" style={{ margin: 0 }}>
+                        <span>{selectedElectron ? 'SELECTED ELECTRON' : 'ELECTRON INSPECTOR'}</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        title="Open electron details full screen"
+                        aria-label="Open electron details full screen"
+                        onClick={() => setAtomicInspectorFullscreen(true)}
+                      >
+                        <Maximize2 size={16} />
+                      </button>
+                    </div>
+                    {selectedElectron ? (
+                      <>
+                        <div className="property-row">
+                          <span>Particle</span>
+                          <strong className="property-value">Electron (e⁻)</strong>
+                        </div>
+                        <div className="property-row">
+                          <span>Electron number</span>
+                          <strong className="property-value">{selectedElectron.number}</strong>
+                        </div>
+                        <div className="property-row">
+                          <span>Shell / energy level</span>
+                          <strong className="property-value">{selectedElectron.shell}</strong>
+                        </div>
+                        <div className="property-row">
+                          <span>Electric charge</span>
+                          <strong className="property-value">−1 e</strong>
+                        </div>
+                        <div className="property-row">
+                          <span>Charge (coulombs)</span>
+                          <strong className="property-value">−1.602 × 10⁻¹⁹ C</strong>
+                        </div>
+                        <div className="property-row">
+                          <span>Rest mass</span>
+                          <strong className="property-value">9.109 × 10⁻³¹ kg</strong>
+                        </div>
+                        <p style={{ fontSize: 12, lineHeight: 1.6, opacity: 0.78, marginTop: 10 }}>
+                          This electron is shown in shell {selectedElectron.shell} of {selectedElement.name} ({selectedElement.symbol}).
+                          The shell is a simplified energy-level representation, not a literal fixed electron path.
+                        </p>
+                      </>
+                    ) : (
+                      <p style={{ fontSize: 12, lineHeight: 1.6, opacity: 0.78, margin: 0 }}>
+                        Click a glowing electron in the 3D atom to inspect its particle properties here.
+                      </p>
+                    )}
+                  </section>
+
+                  {atomicInspectorFullscreen && (
+                    <div
+                      role="dialog"
+                      aria-modal="true"
+                      aria-labelledby="atomic-electron-fullscreen-title"
+                      style={{
+                        position: 'fixed',
+                        inset: 0,
+                        zIndex: 9999,
+                        background: 'rgba(5, 12, 25, 0.96)',
+                        color: '#eef7ff',
+                        padding: 'clamp(20px, 5vw, 64px)',
+                        overflowY: 'auto',
+                      }}
+                    >
+                      <div style={{ maxWidth: 900, margin: '0 auto' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 28 }}>
+                          <div>
+                            <span style={{ fontSize: 11, letterSpacing: 2, opacity: 0.7 }}>HOLOSTUDY AI · ATOMIC INSPECTOR</span>
+                            <h2 id="atomic-electron-fullscreen-title" style={{ margin: '8px 0 0' }}>
+                              {selectedElectron ? `Electron ${selectedElectron.number} · Shell ${selectedElectron.shell}` : 'Electron Details'}
+                            </h2>
+                          </div>
+                          <button
+                            type="button"
+                            className="icon-button"
+                            title="Close full screen"
+                            aria-label="Close full screen"
+                            onClick={() => setAtomicInspectorFullscreen(false)}
+                          >
+                            <Minimize2 size={18} />
+                          </button>
+                        </div>
+
+                        {selectedElectron ? (
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+                            {[
+                              ['Particle type', 'Electron (e⁻)'],
+                              ['Element', `${selectedElement.name} (${selectedElement.symbol})`],
+                              ['Electron number', String(selectedElectron.number)],
+                              ['Shell / energy level', String(selectedElectron.shell)],
+                              ['Electric charge', '−1 elementary charge'],
+                              ['Charge in coulombs', '−1.602 × 10⁻¹⁹ C'],
+                              ['Rest mass', '9.109 × 10⁻³¹ kg'],
+                              ['Atomic number', String(selectedElement.atomicNumber)],
+                              ['Neutral atom electrons', String(selectedElement.atomicNumber)],
+                            ].map(([label, value]) => (
+                              <div key={label} style={{ padding: 18, border: '1px solid rgba(115, 205, 255, 0.24)', borderRadius: 12, background: 'rgba(66, 207, 255, 0.06)' }}>
+                                <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>{label}</div>
+                                <strong style={{ fontSize: 16 }}>{value}</strong>
+                              </div>
+                            ))}
+                            <p style={{ gridColumn: '1 / -1', lineHeight: 1.7, opacity: 0.8 }}>
+                              Electrons are negatively charged subatomic particles. Shell numbers are simplified energy-level labels in this visualization; actual electrons are described by quantum states rather than classical circular paths.
+                            </p>
+                          </div>
+                        ) : (
+                          <p>Close this view, then click an electron in the 3D atom to see its details.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {showDetailedProperties && <>
+                  <div className="property-section-title">
+                    <span>ELEMENT PROPERTIES</span>
+                    <span className="property-count">06</span>
+                  </div>
+
+                  <div className="atomic-inspector-element">
+                    <span className="atomic-inspector-symbol">{selectedElement.symbol}</span>
+                    <div>
+                      <strong>{selectedElement.name}</strong>
+                      <span>{selectedElement.category}</span>
+                    </div>
+                  </div>
+
+                  <div className="property-row">
+                    <span>Atomic number / Protons</span>
+                    <strong className="property-value">{selectedElement.atomicNumber}</strong>
+                  </div>
+                  <div className="property-row">
+                    <span>Atomic mass</span>
+                    <strong className="property-value">
+                      {selectedElement.atomicMass ?? 'Unknown'} u
+                    </strong>
+                  </div>
+                  <div className="property-row">
+                    <span>Mass number (isotope)</span>
+                    <strong className="property-value">
+                      {selectedElement.commonMassNumber ?? 'Not specified'}
+                    </strong>
+                  </div>
+                  <div className="property-row">
+                    <span>Neutrons (selected isotope)</span>
+                    <strong className="property-value">
+                      {selectedElement.commonMassNumber === null
+                        ? 'Not specified'
+                        : selectedElement.commonMassNumber - selectedElement.atomicNumber}
+                    </strong>
+                  </div>
+                  <div className="property-row">
+                    <span>Electrons (neutral atom)</span>
+                    <strong className="property-value">{selectedElement.atomicNumber}</strong>
+                  </div>
+                  <div className="property-row">
+                    <span>Period / Group</span>
+                    <strong className="property-value">
+                      {selectedElement.period} / {selectedElement.group ?? '—'}
+                    </strong>
+                  </div>
+
+                  <details className="atomic-inspector-info">
+                    <summary>Element Info &amp; Electron Configuration</summary>
+                    <div className="atomic-inspector-info-body">
+                      <span>Symbol</span>
+                      <strong>{selectedElement.symbol}</strong>
+                      <span>Electron configuration</span>
+                      <code>{selectedElement.electronConfiguration}</code>
+                      <span>Shell distribution</span>
+                      <code>{selectedElement.shells.join(' · ') || 'Unavailable'}</code>
+                      <p>
+                        Atomic mass is the standard atomic weight where available.
+                        Mass number identifies a particular isotope.
+                      </p>
+                    </div>
+                  </details>
+                  </>}
+                </>
+              ) : (
+                <>
+                  {showDetailedProperties && <>
+                  <div className="property-section-title">
+                    <span>MODEL PROPERTIES</span>
+                    <span className="property-count">03</span>
+                  </div>
+
+                  <div className="property-row">
+                    <span>Representation</span>
+                    <span className="property-value">3D Preview</span>
+                  </div>
+                  <div className="property-row">
+                    <span>Labels</span>
+                    <span className={`property-value ${showLabels ? 'value-enabled' : ''}`}>
+                      {showLabels ? 'Enabled' : 'Hidden'}
+                    </span>
+                  </div>
+                  <div className="property-row">
+                    <span>Interaction</span>
+                    <span className="property-value value-enabled">
+                      {selectedModel === 'Neural Network' ? 'Interactive' : 'Coming soon'}
+                    </span>
+                  </div>
+
+                  <div className="property-row">
+                    <span>Selected neuron</span>
+                    <span className="property-value">
+                      {selectedNeuron ? `N${selectedNeuron.id + 1}` : 'None'}
+                    </span>
+                  </div>
+                  </>}
+                </>
+              )}
+
+              {showDetailedProperties && selectedNeuron && selectedModel === 'Neural Network' && neuronDetails && (
+                <div className="selected-neuron-card neuron-inspector">
+                  <div className="neuron-inspector-heading">
+                    <div>
+                      <span className="section-eyebrow">NEURON INSPECTOR · DEMO DATA</span>
+                      <h3>{selectedNeuron.label}</h3>
+                      <p>Layer {selectedNeuron.layer + 1} · Position {selectedNeuron.index + 1}</p>
+                    </div>
+                    <button
+                      className="neuron-expand-button"
+                      onClick={() => setInspectorFullscreen(true)}
+                    >
+                      <Maximize2 size={16} />
+                      <span>Expand Inspector</span>
+                    </button>
+                  </div>
+
+                  <div className="neuron-inspector-metrics">
+                    <div><span>INCOMING</span><strong>{neuronDetails.incoming.length}</strong></div>
+                    <div><span>OUTGOING</span><strong>{neuronDetails.outgoing.length}</strong></div>
+                    <div><span>ACTIVATION</span><strong>{neuronDetails.activation.toFixed(3)}</strong></div>
+                  </div>
+
+                  <div className="neuron-inspector-section">
+                    <strong>Computation</strong>
+                    <div className="neuron-detail-row"><span>Bias</span><code>{neuronDetails.bias.toFixed(3)}</code></div>
+                    <div className="neuron-detail-row"><span>Weighted sum (z)</span><code>{neuronDetails.weightedSum.toFixed(3)}</code></div>
+                    <div className="neuron-detail-row"><span>Activation function</span><code>{selectedNeuron.layer === 0 ? 'Input' : 'ReLU'}</code></div>
+                  </div>
+
+                  <div className="neuron-inspector-section">
+                    <strong>Incoming connections</strong>
+                    {neuronDetails.incoming.length === 0 ? (
+                      <p className="neuron-inspector-note">Input-layer neuron: no previous-layer connections.</p>
+                    ) : neuronDetails.incoming.map((item) => (
+                      <div className="neuron-connection-row" key={item.neuronId}>
+                        <div><strong>{item.neuronLabel}</strong><span>Input {item.inputValue.toFixed(3)}</span></div>
+                        <div><code>Weight {item.weight.toFixed(3)}</code><code>Contribution {item.contribution.toFixed(3)}</code></div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="neuron-inspector-section">
+                    <strong>Outgoing connections</strong>
+                    {neuronDetails.outgoing.length === 0 ? (
+                      <p className="neuron-inspector-note">Output-layer neuron: no next-layer connections.</p>
+                    ) : neuronDetails.outgoing.map((item) => (
+                      <div className="neuron-connection-row" key={item.neuronId}>
+                        <div><strong>{item.neuronLabel}</strong><span>Outgoing connection</span></div>
+                        <code>Weight {item.weight.toFixed(3)}</code>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="neuron-inspector-note">
+                    Illustrative demo calculations—not trained model parameters or real inference.
+                  </p>
+
+                  <button className="neuron-clear-button" onClick={() => setSelectedNeuron(null)}>
+                    Clear selection
+                  </button>
+                </div>
+              )}
+
+              {inspectorFullscreen && selectedNeuron && neuronDetails && (
+                <div className="neuron-fullscreen-overlay" role="dialog" aria-modal="true" aria-labelledby="neuron-fullscreen-title">
+                  <div className="neuron-fullscreen-header">
+                    <div>
+                      <span className="section-eyebrow">HOLOSTUDY AI · NEURON EXPLORER</span>
+                      <h2 id="neuron-fullscreen-title">{selectedNeuron.label}</h2>
+                      <p>Layer {selectedNeuron.layer + 1} · Position {selectedNeuron.index + 1} · Demo data</p>
+                    </div>
+                    <button className="neuron-close-fullscreen" onClick={() => setInspectorFullscreen(false)}>
+                      <Minimize2 size={17} />
+                      <span>Exit full screen</span>
+                    </button>
+                  </div>
+
+                  <div className="neuron-fullscreen-content">
+                    <div className="neuron-inspector-metrics">
+                      <div><span>INCOMING</span><strong>{neuronDetails.incoming.length}</strong></div>
+                      <div><span>OUTGOING</span><strong>{neuronDetails.outgoing.length}</strong></div>
+                      <div><span>ACTIVATION</span><strong>{neuronDetails.activation.toFixed(3)}</strong></div>
+                    </div>
+
+                    <section className="neuron-inspector-section">
+                      <h3>Computation</h3>
+                      <div className="neuron-detail-row"><span>Bias</span><code>{neuronDetails.bias.toFixed(3)}</code></div>
+                      <div className="neuron-detail-row"><span>Weighted sum (z)</span><code>{neuronDetails.weightedSum.toFixed(3)}</code></div>
+                      <div className="neuron-detail-row"><span>Activation function</span><code>{selectedNeuron.layer === 0 ? 'Input' : 'ReLU'}</code></div>
+                      <p className="neuron-inspector-note">Weighted sum = sum of (input × weight) + bias.</p>
+                    </section>
+
+                    <div className="neuron-fullscreen-columns">
+                      <section className="neuron-inspector-section">
+                        <h3>Incoming connections ({neuronDetails.incoming.length})</h3>
+                        {neuronDetails.incoming.length === 0 ? (
+                          <p className="neuron-inspector-note">No previous-layer connections.</p>
+                        ) : neuronDetails.incoming.map((item) => (
+                          <div className="neuron-connection-row" key={item.neuronId}>
+                            <div><strong>{item.neuronLabel}</strong><span>Input {item.inputValue.toFixed(3)}</span></div>
+                            <div><code>Weight {item.weight.toFixed(3)}</code><code>Contribution {item.contribution.toFixed(3)}</code></div>
+                          </div>
+                        ))}
+                      </section>
+
+                      <section className="neuron-inspector-section">
+                        <h3>Outgoing connections ({neuronDetails.outgoing.length})</h3>
+                        {neuronDetails.outgoing.length === 0 ? (
+                          <p className="neuron-inspector-note">No next-layer connections.</p>
+                        ) : neuronDetails.outgoing.map((item) => (
+                          <div className="neuron-connection-row" key={item.neuronId}>
+                            <div><strong>{item.neuronLabel}</strong><span>Outgoing connection</span></div>
+                            <code>Weight {item.weight.toFixed(3)}</code>
+                          </div>
+                        ))}
+                      </section>
+                    </div>
+
+                    <p className="neuron-inspector-note neuron-demo-warning">
+                      Illustrative demo calculations—not trained model parameters or real inference.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="panel-divider" />
+
+              <div className="property-section-title">
+                <span>AVAILABLE ACTIONS</span>
+              </div>
+
+              <button className="action-row" onClick={() => setShowLabels(!showLabels)}>
+                <div className="action-icon"><Eye size={16} /></div>
+                <div><strong>{showLabels ? 'Hide labels' : 'Show labels'}</strong><span>Toggle model annotations</span></div>
+                <ChevronDown className="action-chevron" size={15} />
+              </button>
+
+              <button
+                className="action-row"
+                onClick={() => {
+                  setSelectedModel('Neural Network')
+                  setShowLabels(true)
+                  setSelectedNeuron(null)
+                }}
+              >
+                <div className="action-icon"><Rotate3D size={16} /></div>
+                <div><strong>Reset workspace</strong><span>Restore initial selection</span></div>
+              </button>
+
+              <button
+                className="primary-action"
+                onClick={() => choosePage('What-If Lab')}
+              >
+                <FlaskConical size={17} />
+                Open What-If Lab
+                <span>→</span>
+              </button>
+            </aside>
+          </section>
+
+
+          {inspectorDetailFullscreen && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="model-details-fullscreen-title"
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 10000,
+                overflowY: 'auto',
+                background: '#07101f',
+                color: '#e8f4ff',
+                padding: 'clamp(16px, 3vw, 40px)',
+                boxSizing: 'border-box',
+              }}
+            >
+              <div style={{ maxWidth: 1180, margin: '0 auto' }}>
+                <header style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 16,
+                  marginBottom: 28,
+                  paddingBottom: 20,
+                  borderBottom: '1px solid rgba(125, 211, 252, 0.2)',
+                }}>
+                  <div>
+                    <div className="section-eyebrow">HOLOSTUDY AI · MODEL DETAILS · FULLSCREEN EXPLORER</div>
+                    <h1 id="model-details-fullscreen-title" style={{ fontSize: 'clamp(25px, 4vw, 38px)', margin: '10px 0 6px' }}>
+                      {selectedModel}
+                    </h1>
+                    <p style={{ margin: 0, opacity: 0.72, lineHeight: 1.6 }}>
+                      {currentModel.description}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    title="Close fullscreen details"
+                    aria-label="Close fullscreen details"
+                    onClick={() => setInspectorDetailFullscreen(false)}
+                  >
+                    <Minimize2 size={19} />
+                  </button>
+                </header>
+
+                {selectedModel === 'Atomic Structure' ? (
+                  <>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+                      gap: 12,
+                      marginBottom: 22,
+                    }}>
+                      {[
+                        ['ELEMENT', `${selectedElement.name} (${selectedElement.symbol})`],
+                        ['ATOMIC NUMBER', String(selectedElement.atomicNumber)],
+                        ['ATOMIC MASS', `${selectedElement.atomicMass ?? 'Unknown'} u`],
+                        ['ION CHARGE', `${ionCharge > 0 ? '+' : ''}${ionCharge}`],
+                      ].map(([label, value]) => (
+                        <div key={label} style={{
+                          padding: 18,
+                          border: '1px solid rgba(125, 211, 252, 0.22)',
+                          borderRadius: 13,
+                          background: 'rgba(56, 189, 248, 0.06)',
+                        }}>
+                          <div style={{ fontSize: 11, letterSpacing: 1.3, opacity: 0.65, marginBottom: 9 }}>{label}</div>
+                          <strong style={{ fontSize: 18 }}>{value}</strong>
+                        </div>
+                      ))}
+                    </div>
+
+                    {([
+                      {
+                        id: 'element-properties',
+                        title: 'Element properties',
+                        summary: 'Identity, classification and periodic-table position.',
+                        rows: [
+                          ['Element name', selectedElement.name],
+                          ['Chemical symbol', selectedElement.symbol],
+                          ['Category', selectedElement.category],
+                          ['Atomic number / proton count', String(selectedElement.atomicNumber)],
+                          ['Period', String(selectedElement.period)],
+                          ['Group', selectedElement.group == null ? 'Not assigned in this dataset' : String(selectedElement.group)],
+                          ['Standard atomic mass', `${selectedElement.atomicMass ?? 'Unknown'} u`],
+                          ['Reference mass number', selectedElement.commonMassNumber == null ? 'Not specified' : String(selectedElement.commonMassNumber)],
+                          ['Estimated neutrons for reference isotope', selectedElement.commonMassNumber == null ? 'Not specified' : String(selectedElement.commonMassNumber - selectedElement.atomicNumber)],
+                        ],
+                      },
+                      {
+                        id: 'electronic-configuration',
+                        title: 'Electronic configuration',
+                        summary: 'Electron configuration and shell distribution in the element dataset.',
+                        rows: [
+                          ['Neutral-atom configuration', selectedElement.electronConfiguration],
+                          ['Shell distribution', selectedElement.shells.join(' · ') || 'Unavailable'],
+                          ['Occupied shells in dataset', String(selectedElement.shells.filter((n) => n > 0).length)],
+                          ['Neutral atom electron count', String(selectedElement.atomicNumber)],
+                          ['Current ion charge', `${ionCharge > 0 ? '+' : ''}${ionCharge}`],
+                          ['Estimated ion electron count', String(Math.max(0, selectedElement.atomicNumber - ionCharge))],
+                        ],
+                      },
+                      {
+                        id: 'nuclear-structure',
+                        title: 'Nuclear structure',
+                        summary: 'Protons, isotope reference and neutron interpretation.',
+                        rows: [
+                          ['Protons', String(selectedElement.atomicNumber)],
+                          ['Reference mass number', selectedElement.commonMassNumber == null ? 'Not specified' : String(selectedElement.commonMassNumber)],
+                          ['Reference neutron estimate', selectedElement.commonMassNumber == null ? 'Not specified' : String(selectedElement.commonMassNumber - selectedElement.atomicNumber)],
+                          ['Isotope note', 'Neutron count depends on the isotope. The displayed mass number is a reference value from this dataset.'],
+                        ],
+                      },
+                      {
+                        id: 'chemical-overview',
+                        title: 'Chemical overview',
+                        summary: 'How to interpret this element’s data.',
+                        rows: [
+                          ['Classification', selectedElement.category],
+                          ['Periodic-table period', String(selectedElement.period)],
+                          ['Periodic-table group', selectedElement.group == null ? 'Not assigned in this dataset' : String(selectedElement.group)],
+                          ['Atomic mass note', 'Atomic mass is not the same as the mass number of an individual isotope.'],
+                          ['Electron model note', 'Shells are a simplified energy-level representation; electrons are described more accurately by quantum states.'],
+                        ],
+                      },
+                    ]).map((section) => {
+                      const expanded = expandedInfoSections.includes(section.id)
+                      return (
+                        <section key={section.id} style={{
+                          border: '1px solid rgba(125, 211, 252, 0.2)',
+                          borderRadius: 13,
+                          marginBottom: 12,
+                          overflow: 'hidden',
+                          background: 'rgba(15, 31, 51, 0.75)',
+                        }}>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedInfoSections((previous) =>
+                              previous.includes(section.id)
+                                ? previous.filter((id) => id !== section.id)
+                                : [...previous, section.id]
+                            )}
+                            aria-expanded={expanded}
+                            style={{
+                              width: '100%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: 16,
+                              padding: '18px 20px',
+                              color: 'inherit',
+                              textAlign: 'left',
+                              border: 0,
+                              background: 'transparent',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <span>
+                              <strong style={{ display: 'block', fontSize: 16 }}>{section.title}</strong>
+                              <span style={{ display: 'block', fontSize: 12, opacity: 0.65, marginTop: 5 }}>{section.summary}</span>
+                            </span>
+                            <span aria-hidden="true" style={{ fontSize: 22, color: '#7dd3fc' }}>{expanded ? '−' : '+'}</span>
+                          </button>
+                          {expanded && (
+                            <div style={{
+                              padding: '0 20px 20px',
+                              borderTop: '1px solid rgba(125, 211, 252, 0.12)',
+                            }}>
+                              {section.rows.map(([label, value]) => (
+                                <div key={label} style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: 'minmax(130px, 0.8fr) minmax(0, 1.2fr)',
+                                  gap: 14,
+                                  padding: '12px 0',
+                                  borderBottom: '1px solid rgba(125, 211, 252, 0.09)',
+                                  lineHeight: 1.6,
+                                }}>
+                                  <span style={{ opacity: 0.68, fontSize: 13 }}>{label}</span>
+                                  <strong style={{ fontSize: 13, fontWeight: 500, overflowWrap: 'anywhere' }}>{value}</strong>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </section>
+                      )
+                    })}
+                  </>
+                ) : (
+                  <>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                      gap: 14,
+                      marginBottom: 22,
+                    }}>
+                      {[
+                        ['Model', selectedModel],
+                        ['Category', currentModel.category],
+                        ['Representation', 'Interactive 3D preview'],
+                        ['Labels', showLabels ? 'Enabled' : 'Hidden'],
+                        ['Simulation', atomicSimulationOn ? 'Running' : 'Paused'],
+                      ].map(([label, value]) => (
+                        <div key={label} style={{
+                          padding: 18,
+                          border: '1px solid rgba(125, 211, 252, 0.22)',
+                          borderRadius: 13,
+                          background: 'rgba(56, 189, 248, 0.06)',
+                        }}>
+                          <div style={{ fontSize: 11, letterSpacing: 1.2, opacity: 0.65, marginBottom: 9 }}>{label}</div>
+                          <strong style={{ fontSize: 17 }}>{value}</strong>
+                        </div>
+                      ))}
+                    </div>
+
+                    {([
+                      {
+                        id: 'model-overview',
+                        title: 'Model overview',
+                        summary: 'Purpose and interpretation of the selected visualization.',
+                        rows: [
+                          ['Model', selectedModel],
+                          ['Category', currentModel.category],
+                          ['Description', currentModel.description],
+                          ['Representation', 'Interactive 3D educational visualization'],
+                          ['Label visibility', showLabels ? 'Enabled' : 'Hidden'],
+                        ],
+                      },
+                      {
+                        id: 'model-architecture',
+                        title: selectedModel === 'Neural Network' ? 'Network architecture' : 'Structure and components',
+                        summary: 'Main parts and their roles in the represented system.',
+                        rows: selectedModel === 'Neural Network'
+                          ? [
+                              ['Input layer', 'Receives the feature values supplied to the network.'],
+                              ['Hidden layers', 'Transform representations through weighted connections and activation functions.'],
+                              ['Output layer', 'Produces the network output or prediction representation.'],
+                              ['Weights', 'Parameters that scale signals between connected neurons.'],
+                              ['Biases', 'Learnable offsets added to weighted sums.'],
+                              ['Activation', 'Nonlinear function applied to a neuron’s weighted sum.'],
+                            ]
+                          : [
+                              ['Primary structure', 'Explore the visible components in the 3D viewer.'],
+                              ['Components', 'Select or inspect available parts where interactions are supported.'],
+                              ['Visualization', 'The displayed model is an educational representation.'],
+                            ],
+                      },
+                      {
+                        id: 'model-interactions',
+                        title: 'Interaction and simulation',
+                        summary: 'Available controls and interpretation of the current view.',
+                        rows: [
+                          ['3D navigation', 'Use the viewer controls to rotate or zoom the model.'],
+                          ['Labels', showLabels ? 'Currently enabled' : 'Currently hidden'],
+                          ['Simulation control', 'Use the viewer play/pause control where supported.'],
+                          ['Selected neuron', selectedModel === 'Neural Network' && selectedNeuron ? selectedNeuron.label : 'No neuron selected'],
+                          ['Data limitation', 'Only data explicitly displayed by this prototype should be treated as measured or computed output.'],
+                        ],
+                      },
+                    ]).map((section) => {
+                      const expanded = expandedInfoSections.includes(section.id)
+                      return (
+                        <section key={section.id} style={{
+                          border: '1px solid rgba(125, 211, 252, 0.2)',
+                          borderRadius: 13,
+                          marginBottom: 12,
+                          overflow: 'hidden',
+                          background: 'rgba(15, 31, 51, 0.75)',
+                        }}>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedInfoSections((previous) =>
+                              previous.includes(section.id)
+                                ? previous.filter((id) => id !== section.id)
+                                : [...previous, section.id]
+                            )}
+                            aria-expanded={expanded}
+                            style={{
+                              width: '100%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: 16,
+                              padding: '18px 20px',
+                              color: 'inherit',
+                              textAlign: 'left',
+                              border: 0,
+                              background: 'transparent',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <span>
+                              <strong style={{ display: 'block', fontSize: 16 }}>{section.title}</strong>
+                              <span style={{ display: 'block', fontSize: 12, opacity: 0.65, marginTop: 5 }}>{section.summary}</span>
+                            </span>
+                            <span aria-hidden="true" style={{ fontSize: 22, color: '#7dd3fc' }}>{expanded ? '−' : '+'}</span>
+                          </button>
+                          {expanded && (
+                            <div style={{ padding: '0 20px 20px', borderTop: '1px solid rgba(125, 211, 252, 0.12)' }}>
+                              {section.rows.map(([label, value]) => (
+                                <div key={label} style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: 'minmax(130px, 0.8fr) minmax(0, 1.2fr)',
+                                  gap: 14,
+                                  padding: '12px 0',
+                                  borderBottom: '1px solid rgba(125, 211, 252, 0.09)',
+                                  lineHeight: 1.6,
+                                }}>
+                                  <span style={{ opacity: 0.68, fontSize: 13 }}>{label}</span>
+                                  <strong style={{ fontSize: 13, fontWeight: 500, overflowWrap: 'anywhere' }}>{value}</strong>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </section>
+                      )
+                    })}
+                  </>
+                )}
+
+                <footer style={{ marginTop: 24, opacity: 0.6, fontSize: 12, lineHeight: 1.6 }}>
+                  Educational visualization · Values and explanations depend on the selected model and the data available in this prototype.
+                </footer>
+              </div>
+            </div>
+          )}
+
+          <section className="library-section">
+            <div className="library-heading">
+              <div>
+                <div className="section-eyebrow">START LEARNING</div>
+                <h2>Explore concepts</h2>
+              </div>
+              <span className="library-count">{filteredModels.length} MODELS</span>
+            </div>
+
+            <div className="model-cards">
+              {filteredModels.map((model, index) => {
+                const Icon = model.icon
+                return (
+                  <button
+                    key={model.name}
+                    className={`model-card ${selectedModel === model.name ? 'model-card-selected' : ''}`}
+                    onClick={() => {
+                      setSelectedModel(model.name)
+                      setActivePage('Dashboard')
+                    }}
+                  >
+                    <div className={`model-card-icon model-icon-${index}`}>
+                      <Icon size={23} strokeWidth={1.7} />
+                    </div>
+                    <div className="model-card-info">
+                      <span>{model.category}</span>
+                      <strong>{model.name}</strong>
+                      <p>{model.description}</p>
+                    </div>
+                    <div className="model-card-arrow">↗</div>
+                  </button>
+                )
+              })}
+              {filteredModels.length === 0 && (
+                <div className="no-results">
+                  No models match “{search}”. Try another search.
+                </div>
+              )}
+              <button className="model-card add-model-card" onClick={() => document.getElementById('model-upload')?.click()}>
+                <div className="add-model-icon"><Plus size={23} /></div>
+                <strong>Bring your own</strong>
+                <p>Upload a diagram to get started.</p>
+              </button>
+            </div>
+          </section>
+
+          <footer className="page-footer">
+            <span>© 2026 HOLOSTUDY AI</span>
+            <span><Waves size={13} /> BUILT FOR CURIOUS MINDS</span>
+            <span className="footer-version">PREVIEW · V0.1</span>
+          </footer>
+        </div>
+      </section>
+
+      <div className="mobile-menu-button">
+        <button onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle menu">
+          <Menu size={20} />
+        </button>
+      </div>
+    </main>
+  )
+}
+
+export default App

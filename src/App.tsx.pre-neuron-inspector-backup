@@ -1,0 +1,574 @@
+import { useState } from 'react'
+import NeuralNetwork3D from './components/NeuralNetwork3D'
+import {
+  Activity,
+  Atom,
+  BrainCircuit,
+  ChevronDown,
+  CircleHelp,
+  Cpu,
+  Eye,
+  FileImage,
+  FlaskConical,
+  Layers3,
+  Menu,
+  Maximize2,
+  Minimize2,
+  Network,
+  PanelLeftClose,
+  Plus,
+  Rotate3D,
+  Search,
+  Settings2,
+  ShieldCheck,
+  Sparkles,
+  Upload,
+  Waves,
+  ZoomIn,
+  ZoomOut,
+  Bell,
+  Command,
+} from 'lucide-react'
+import './App.css'
+
+type Model = {
+  name: string
+  category: string
+  description: string
+  icon: typeof BrainCircuit
+}
+
+const models: Model[] = [
+  {
+    name: 'Neural Network',
+    category: 'ARTIFICIAL INTELLIGENCE',
+    description: 'Explore neurons, layers and information flow.',
+    icon: BrainCircuit,
+  },
+  {
+    name: 'Atomic Structure',
+    category: 'CHEMISTRY',
+    description: 'Explore protons, neutrons and electrons.',
+    icon: Atom,
+  },
+  {
+    name: 'Human Heart',
+    category: 'BIOLOGY',
+    description: 'Discover the structures of the human heart.',
+    icon: Activity,
+  },
+  {
+    name: 'Computer Architecture',
+    category: 'COMPUTER SCIENCE',
+    description: 'Understand the components of a computer.',
+    icon: Cpu,
+  },
+]
+
+type SelectedNeuron = {
+  id: number
+  layer: number
+  index: number
+  position: [number, number, number]
+  label: string
+}
+
+function App() {
+  const [selectedNeuron, setSelectedNeuron] = useState<SelectedNeuron | null>(null)
+  const [activePage, setActivePage] = useState('Dashboard')
+  const [selectedModel, setSelectedModel] = useState('Neural Network')
+  const [search, setSearch] = useState('')
+  const [showLabels, setShowLabels] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [showModelMenu, setShowModelMenu] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [fullscreenElement, setFullscreenElement] = useState<HTMLDivElement | null>(null)
+
+  useState(() => {
+    const syncFullscreen = () => setIsFullscreen(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', syncFullscreen)
+    return () => document.removeEventListener('fullscreenchange', syncFullscreen)
+  })
+
+  const currentModel =
+    models.find((model) => model.name === selectedModel) ?? models[0]
+
+  const filteredModels = models.filter((model) =>
+    model.name.toLowerCase().includes(search.toLowerCase()),
+  )
+
+  const navigation = [
+    { label: 'Dashboard', icon: Layers3 },
+    { label: 'Explore Models', icon: Network },
+    { label: 'My Models', icon: FileImage },
+    { label: 'What-If Lab', icon: FlaskConical },
+  ]
+
+  function choosePage(page: string) {
+    setActivePage(page)
+    if (page === 'Explore Models') {
+      setShowModelMenu(true)
+    }
+  }
+
+  return (
+    <main className="app-shell">
+      <aside className={`sidebar ${sidebarOpen ? '' : 'sidebar-collapsed'}`}>
+        <div className="brand">
+          <div className="brand-mark">
+            <BrainCircuit size={25} strokeWidth={1.8} />
+            <span className="brand-spark">✦</span>
+          </div>
+          {sidebarOpen && (
+            <div className="brand-copy">
+              <span className="brand-name">HoloStudy<span> AI</span></span>
+              <span className="brand-caption">VISUAL LEARNING STUDIO</span>
+            </div>
+          )}
+          <button
+            className="icon-button sidebar-toggle"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            title="Toggle sidebar"
+          >
+            <PanelLeftClose size={17} />
+          </button>
+        </div>
+
+        {sidebarOpen && <div className="workspace-label">WORKSPACE</div>}
+
+        <nav className="side-navigation">
+          {navigation.map(({ label, icon: Icon }) => (
+            <button
+              key={label}
+              className={`nav-item ${activePage === label ? 'active' : ''}`}
+              onClick={() => choosePage(label)}
+              title={label}
+            >
+              <Icon size={19} strokeWidth={1.8} />
+              {sidebarOpen && <span>{label}</span>}
+              {sidebarOpen && label === 'What-If Lab' && (
+                <span className="nav-badge">LAB</span>
+              )}
+            </button>
+          ))}
+        </nav>
+
+        {sidebarOpen && (
+          <>
+            <div className="sidebar-divider" />
+            <div className="workspace-label">QUICK ACCESS</div>
+            <div className="quick-access">
+              <button onClick={() => setSelectedModel('Neural Network')}>
+                <span className="quick-dot cyan-dot" />
+                Neural Network
+                <span className="quick-type">3D</span>
+              </button>
+              <button onClick={() => setSelectedModel('Atomic Structure')}>
+                <span className="quick-dot purple-dot" />
+                Atomic Structure
+                <span className="quick-type">3D</span>
+              </button>
+              <button onClick={() => setSelectedModel('Human Heart')}>
+                <span className="quick-dot pink-dot" />
+                Human Heart
+                <span className="quick-type">3D</span>
+              </button>
+            </div>
+
+            <div className="sidebar-bottom">
+              <div className="upgrade-card">
+                <div className="upgrade-icon">
+                  <Sparkles size={17} />
+                </div>
+                <strong>Learning, visualized.</strong>
+                <p>Turn complex concepts into interactive experiences.</p>
+              </div>
+              <button className="nav-item">
+                <Settings2 size={18} />
+                <span>Settings</span>
+              </button>
+              <button className="nav-item">
+                <CircleHelp size={18} />
+                <span>Help & Support</span>
+              </button>
+              <div className="user-card">
+                <div className="avatar">K</div>
+                <div className="user-info">
+                  <strong>Student Workspace</strong>
+                  <span>Free workspace</span>
+                </div>
+                <ChevronDown size={15} />
+              </div>
+            </div>
+          </>
+        )}
+      </aside>
+
+      <section className="main-area">
+        <header className="topbar">
+          <div className="breadcrumb">
+            <span>Workspace</span>
+            <span className="breadcrumb-slash">/</span>
+            <strong>{activePage}</strong>
+          </div>
+
+          <div className="topbar-actions">
+            <label className="global-search">
+              <Search size={16} />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search models..."
+                aria-label="Search models"
+              />
+              <kbd><Command size={10} /> K</kbd>
+            </label>
+            <button className="icon-button notification-button" title="Notifications">
+              <Bell size={18} />
+              <span />
+            </button>
+            <div className="top-avatar">K</div>
+          </div>
+        </header>
+
+        <div className="page-content">
+          <section className="welcome-section">
+            <div>
+              <div className="eyebrow">
+                <span className="live-dot" />
+                YOUR INTERACTIVE LEARNING SPACE
+              </div>
+              <h1>Understand the <span>unseen.</span></h1>
+              <p className="welcome-description">
+                Explore complex concepts in 3D. Interact, experiment, and
+                discover how things really work.
+              </p>
+            </div>
+            <button className="upload-button" onClick={() => document.getElementById('model-upload')?.click()}>
+              <Upload size={17} />
+              Upload a diagram
+            </button>
+            <input
+              id="model-upload"
+              type="file"
+              accept="image/*,.pdf"
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                if (file) {
+                  window.alert(`Selected: ${file.name}. Diagram analysis will be added in a later step.`)
+                }
+              }}
+            />
+          </section>
+
+          <section className="stats-row">
+            <div className="stat-card">
+              <div className="stat-icon cyan-bg"><Network size={19} /></div>
+              <div><span>MODEL LIBRARY</span><strong>04 <small>topics</small></strong></div>
+              <div className="stat-decoration">◈</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon purple-bg"><Rotate3D size={19} /></div>
+              <div><span>3D WORKSPACE</span><strong>Ready <small>to explore</small></strong></div>
+              <div className="stat-decoration">⌘</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon green-bg"><ShieldCheck size={19} /></div>
+              <div><span>LEARNING MODE</span><strong>Interactive</strong></div>
+              <div className="status-pill"><span /> Active</div>
+            </div>
+          </section>
+
+          <section className="explorer-heading">
+            <div>
+              <div className="section-eyebrow">YOUR WORKSPACE</div>
+              <h2>3D Model Explorer</h2>
+              <p>Select a concept to start exploring its structure.</p>
+            </div>
+            <button className="text-button" onClick={() => choosePage('Explore Models')}>
+              Browse library <span>↗</span>
+            </button>
+          </section>
+
+          <section className="explorer-layout">
+            <div className={`viewer-card ${isFullscreen ? "viewer-card-fullscreen" : ""}`} ref={setFullscreenElement}>
+              <div className="viewer-toolbar">
+                <div className="model-selector-wrap">
+                  <button
+                    className="model-selector"
+                    onClick={() => setShowModelMenu(!showModelMenu)}
+                  >
+                    <currentModel.icon size={18} />
+                    <span>{selectedModel}</span>
+                    <ChevronDown size={15} />
+                  </button>
+                  {showModelMenu && (
+                    <div className="model-dropdown">
+                      {models.map((model) => {
+                        const Icon = model.icon
+                        return (
+                          <button
+                            key={model.name}
+                            onClick={() => {
+                              setSelectedModel(model.name)
+                              setShowModelMenu(false)
+                            }}
+                          >
+                            <Icon size={17} />
+                            <span>{model.name}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+                <div className="viewer-tools">
+                  <button
+                    className={`viewer-tool ${showLabels ? 'tool-active' : ''}`}
+                    onClick={() => setShowLabels(!showLabels)}
+                    title="Toggle labels"
+                  >
+                    <Eye size={16} />
+                    <span>Labels</span>
+                  </button>
+                  <span className="tool-divider" />
+                  <button className="icon-button" title="Zoom in"><ZoomIn size={17} /></button>
+                  <button className="icon-button" title="Zoom out"><ZoomOut size={17} /></button>
+                  <button
+                    className="icon-button fullscreen-toggle"
+                    title={isFullscreen ? "Exit full screen (Esc)" : "Analyze diagram full screen"}
+                    aria-label={isFullscreen ? "Exit full screen" : "Analyze diagram full screen"}
+                    onClick={async () => {
+                      if (!fullscreenElement) return
+                      try {
+                        if (document.fullscreenElement) {
+                          await document.exitFullscreen()
+                        } else {
+                          await fullscreenElement.requestFullscreen()
+                        }
+                      } catch (error) {
+                        console.error("Fullscreen could not be opened:", error)
+                      }
+                    }}
+                  >
+                    {isFullscreen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+                  </button>
+                  <button className="icon-button" title="View settings"><Settings2 size={17} /></button>
+                </div>
+              </div>
+
+              <div className="viewer-canvas actual-3d-canvas">
+                <div className="canvas-top-label">
+                  <span className="canvas-live-dot" />
+                  INTERACTIVE 3D VIEW
+                </div>
+
+                {selectedModel === 'Neural Network' ? (
+                  <NeuralNetwork3D
+                    showLabels={showLabels}
+                    onSelectNeuron={setSelectedNeuron}
+                  />
+                ) : (
+                  <div className="model-coming-soon">
+                    <currentModel.icon size={42} strokeWidth={1.3} />
+                    <strong>{currentModel.name}</strong>
+                    <span>This model will be implemented in a later step.</span>
+                    <button onClick={() => setSelectedModel('Neural Network')}>
+                      Open Neural Network
+                    </button>
+                  </div>
+                )}
+
+                <div className="canvas-instructions">
+                  <Rotate3D size={15} />
+                  <span>Drag to rotate · Scroll to zoom · Click a neuron to inspect</span>
+                </div>
+
+                <div className="canvas-bottom-left">
+                  <span className="coordinate-dot" />
+                  PERSPECTIVE VIEW
+                </div>
+                <div className="canvas-bottom-right">
+                  <span>X</span><span>Y</span><span>Z</span>
+                </div>
+              </div>
+
+              <div className="viewer-footer">
+                <div className="viewer-footer-left">
+                  <span className="render-indicator" />
+                  <span>Interactive 3D workspace</span>
+                  <span className="footer-separator">/</span>
+                  <span className="muted">{selectedModel}</span>
+                </div>
+                <div className="viewer-footer-right">
+                  <span>GRID</span>
+                  <span className="grid-status">ON</span>
+                </div>
+              </div>
+            </div>
+
+            <aside className="properties-panel">
+              <div className="panel-heading">
+                <div>
+                  <span className="section-eyebrow">INSPECTOR</span>
+                  <h3>Model details</h3>
+                </div>
+                <button className="icon-button" title="Inspector settings">
+                  <Settings2 size={17} />
+                </button>
+              </div>
+
+              <div className="model-preview-icon">
+                <div className="preview-icon-inner">
+                  <currentModel.icon size={32} strokeWidth={1.5} />
+                </div>
+                <div className="preview-model-name">
+                  <strong>{currentModel.name}</strong>
+                  <span>{currentModel.category}</span>
+                </div>
+              </div>
+
+              <p className="model-description">{currentModel.description}</p>
+
+              <div className="panel-divider" />
+
+              <div className="property-section-title">
+                <span>MODEL PROPERTIES</span>
+                <span className="property-count">03</span>
+              </div>
+
+              <div className="property-row">
+                <span>Representation</span>
+                <span className="property-value">3D Preview</span>
+              </div>
+              <div className="property-row">
+                <span>Labels</span>
+                <span className={`property-value ${showLabels ? 'value-enabled' : ''}`}>
+                  {showLabels ? 'Enabled' : 'Hidden'}
+                </span>
+              </div>
+              <div className="property-row">
+                <span>Interaction</span>
+                <span className="property-value value-enabled">
+                  {selectedModel === 'Neural Network' ? 'Interactive' : 'Coming soon'}
+                </span>
+              </div>
+
+              <div className="property-row">
+                <span>Selected neuron</span>
+                <span className="property-value">
+                  {selectedNeuron ? `N${selectedNeuron.id + 1}` : 'None'}
+                </span>
+              </div>
+
+              {selectedNeuron && selectedModel === 'Neural Network' && (
+                <div className="selected-neuron-card">
+                  <span className="section-eyebrow">SELECTED COMPONENT</span>
+                  <strong>{selectedNeuron.label}</strong>
+                  <span>Layer {selectedNeuron.layer + 1} · Position {selectedNeuron.index + 1}</span>
+                  <button onClick={() => setSelectedNeuron(null)}>
+                    Clear selection
+                  </button>
+                </div>
+              )}
+
+              <div className="panel-divider" />
+
+              <div className="property-section-title">
+                <span>AVAILABLE ACTIONS</span>
+              </div>
+
+              <button className="action-row" onClick={() => setShowLabels(!showLabels)}>
+                <div className="action-icon"><Eye size={16} /></div>
+                <div><strong>{showLabels ? 'Hide labels' : 'Show labels'}</strong><span>Toggle model annotations</span></div>
+                <ChevronDown className="action-chevron" size={15} />
+              </button>
+
+              <button
+                className="action-row"
+                onClick={() => {
+                  setSelectedModel('Neural Network')
+                  setShowLabels(true)
+                  setSelectedNeuron(null)
+                }}
+              >
+                <div className="action-icon"><Rotate3D size={16} /></div>
+                <div><strong>Reset workspace</strong><span>Restore initial selection</span></div>
+              </button>
+
+              <button
+                className="primary-action"
+                onClick={() => choosePage('What-If Lab')}
+              >
+                <FlaskConical size={17} />
+                Open What-If Lab
+                <span>→</span>
+              </button>
+            </aside>
+          </section>
+
+          <section className="library-section">
+            <div className="library-heading">
+              <div>
+                <div className="section-eyebrow">START LEARNING</div>
+                <h2>Explore concepts</h2>
+              </div>
+              <span className="library-count">{filteredModels.length} MODELS</span>
+            </div>
+
+            <div className="model-cards">
+              {filteredModels.map((model, index) => {
+                const Icon = model.icon
+                return (
+                  <button
+                    key={model.name}
+                    className={`model-card ${selectedModel === model.name ? 'model-card-selected' : ''}`}
+                    onClick={() => {
+                      setSelectedModel(model.name)
+                      setActivePage('Dashboard')
+                    }}
+                  >
+                    <div className={`model-card-icon model-icon-${index}`}>
+                      <Icon size={23} strokeWidth={1.7} />
+                    </div>
+                    <div className="model-card-info">
+                      <span>{model.category}</span>
+                      <strong>{model.name}</strong>
+                      <p>{model.description}</p>
+                    </div>
+                    <div className="model-card-arrow">↗</div>
+                  </button>
+                )
+              })}
+              {filteredModels.length === 0 && (
+                <div className="no-results">
+                  No models match “{search}”. Try another search.
+                </div>
+              )}
+              <button className="model-card add-model-card" onClick={() => document.getElementById('model-upload')?.click()}>
+                <div className="add-model-icon"><Plus size={23} /></div>
+                <strong>Bring your own</strong>
+                <p>Upload a diagram to get started.</p>
+              </button>
+            </div>
+          </section>
+
+          <footer className="page-footer">
+            <span>© 2026 HOLOSTUDY AI</span>
+            <span><Waves size={13} /> BUILT FOR CURIOUS MINDS</span>
+            <span className="footer-version">PREVIEW · V0.1</span>
+          </footer>
+        </div>
+      </section>
+
+      <div className="mobile-menu-button">
+        <button onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle menu">
+          <Menu size={20} />
+        </button>
+      </div>
+    </main>
+  )
+}
+
+export default App

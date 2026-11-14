@@ -1,0 +1,350 @@
+import { useEffect, useRef, useState } from 'react'
+
+export type HumanHeart3DProps = {
+  showLabels?: boolean
+  autoRotate?: boolean
+  simulationOn?: boolean
+  displayMode?: 'default' | 'dark' | 'glass'
+  zoomCommand?: { direction: 'in' | 'out'; id: number } | null
+  onZoomComplete?: () => void
+  rotationCommand?: {
+    direction: 'left' | 'right' | 'up' | 'down' | 'full' | 'reset'
+    id: number
+  } | null
+}
+
+const EXTERIOR_IMAGES = [
+  {
+    src: '/models/heart-exterior-view-1.png',
+    label: 'Anterior Exterior View',
+  },
+  {
+    src: '/models/heart-exterior-view-2.png',
+    label: 'Alternate Exterior View',
+  },
+]
+
+const CUTAWAY_IMAGES = [
+  {
+    src: '/models/heart-cutaway-view-1.png',
+    label: 'Internal Cutaway View 1',
+  },
+  {
+    src: '/models/heart-cutaway-view-2.png',
+    label: 'Internal Cutaway View 2',
+  },
+]
+
+const REFERENCE_IMAGE = '/models/heart-reference-diagram.png'
+
+export default function HumanHeart3D({
+  showLabels = true,
+  displayMode = 'default',
+  zoomCommand = null,
+  onZoomComplete,
+}: HumanHeart3DProps) {
+  const [isSplit, setIsSplit] = useState(false)
+  const [showDiagram, setShowDiagram] = useState(false)
+  const [viewIndex, setViewIndex] = useState(0)
+  const [zoom, setZoom] = useState(1)
+  const [imageError, setImageError] = useState(false)
+  const lastZoomCommandId = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (!zoomCommand || lastZoomCommandId.current === zoomCommand.id) return
+
+    lastZoomCommandId.current = zoomCommand.id
+    setZoom((current) =>
+      Math.max(0.6, Math.min(2.2, current * (zoomCommand.direction === 'in' ? 1.15 : 0.87))),
+    )
+    onZoomComplete?.()
+  }, [zoomCommand, onZoomComplete])
+
+  const images = isSplit ? CUTAWAY_IMAGES : EXTERIOR_IMAGES
+  const currentImage = images[viewIndex % images.length]
+
+  const background =
+    displayMode === 'glass'
+      ? '#071b2b'
+      : displayMode === 'dark'
+        ? '#030711'
+        : '#081321'
+
+  const resetModel = () => {
+    setIsSplit(false)
+    setShowDiagram(false)
+    setViewIndex(0)
+    setZoom(1)
+    setImageError(false)
+  }
+
+  const switchMode = () => {
+    setIsSplit((previous) => !previous)
+    setShowDiagram(false)
+    setViewIndex(0)
+    setZoom(1)
+    setImageError(false)
+  }
+
+  const buttonStyle: React.CSSProperties = {
+    padding: '9px 12px',
+    borderRadius: 8,
+    border: '1px solid rgba(93, 205, 255, 0.55)',
+    background: 'rgba(4, 15, 31, 0.94)',
+    color: '#e8f7ff',
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: 'pointer',
+  }
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        overflow: 'hidden',
+        background: `radial-gradient(ellipse at center, ${background} 0%, #030711 100%)`,
+        color: '#e8f7ff',
+        fontFamily: 'inherit',
+      }}
+    >
+      <header
+        style={{
+          position: 'absolute',
+          top: 14,
+          left: 16,
+          right: 16,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: 12,
+          zIndex: 3,
+          pointerEvents: 'none',
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontSize: 11,
+              letterSpacing: 2,
+              color: '#69d7ff',
+              fontWeight: 700,
+            }}
+          >
+            HOLOSTUDY AI · HUMAN ANATOMY
+          </div>
+          <div style={{ fontSize: 17, fontWeight: 700, marginTop: 5 }}>
+            {showDiagram
+              ? 'Heart Anatomy Reference'
+              : isSplit
+                ? 'Heart — Internal Cutaway'
+                : 'Human Heart — Exterior'}
+          </div>
+          <div style={{ color: '#9bbbd0', fontSize: 11, marginTop: 4 }}>
+            {showDiagram
+              ? 'Labeled anatomical reference image'
+              : isSplit
+                ? 'Explore the internal heart structure'
+                : 'Explore the external anatomy'}
+          </div>
+        </div>
+      </header>
+
+      <div
+        style={{
+          position: 'absolute',
+          top: 14,
+          right: 14,
+          zIndex: 4,
+          display: 'flex',
+          flexWrap: 'wrap',
+          justifyContent: 'flex-end',
+          gap: 8,
+          maxWidth: '55%',
+        }}
+      >
+        <button
+          type="button"
+          onClick={switchMode}
+          aria-pressed={isSplit}
+          style={{
+            ...buttonStyle,
+            background: isSplit
+              ? 'rgba(20, 104, 153, 0.95)'
+              : 'rgba(4, 15, 31, 0.94)',
+          }}
+        >
+          {isSplit ? 'Exterior View' : 'Split Model'}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setShowDiagram((value) => !value)
+            setZoom(1)
+            setImageError(false)
+          }}
+          style={buttonStyle}
+        >
+          {showDiagram ? 'Hide Labels Diagram' : 'Show Labels'}
+        </button>
+
+        <button type="button" onClick={resetModel} style={buttonStyle}>
+          Reset Model
+        </button>
+      </div>
+
+      <main
+        style={{
+          position: 'absolute',
+          inset: '76px 12px 64px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+          border: '1px solid rgba(93, 205, 255, 0.16)',
+          borderRadius: 14,
+          background:
+            'radial-gradient(ellipse at center, rgba(20, 51, 77, 0.4), rgba(2, 8, 18, 0.45))',
+        }}
+      >
+        {!imageError ? (
+          <img
+            key={showDiagram ? REFERENCE_IMAGE : currentImage.src}
+            src={showDiagram ? REFERENCE_IMAGE : currentImage.src}
+            alt={
+              showDiagram
+                ? 'Labeled human heart anatomy diagram'
+                : currentImage.label
+            }
+            onError={() => setImageError(true)}
+            className={showDiagram ? 'heart-reference-image' : 'heart-hologram-image'}
+            style={{
+              display: 'block',
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              transform: `scale(${zoom})`,
+              transition: 'transform 180ms ease, filter 250ms ease',
+              userSelect: 'none',
+              filter: showDiagram
+                ? 'none'
+                : 'sepia(1) saturate(2.8) hue-rotate(145deg) brightness(1.15) contrast(1.12) drop-shadow(0 0 10px rgba(48, 220, 255, 0.75)) drop-shadow(0 0 28px rgba(0, 170, 255, 0.42))',
+              mixBlendMode: showDiagram ? 'normal' : 'screen',
+              opacity: showDiagram ? 1 : 0.94,
+            }}
+          />
+        ) : (
+          <div style={{ padding: 24, textAlign: 'center', maxWidth: 420 }}>
+            <div style={{ fontWeight: 700, color: '#ff9aa9' }}>
+              Image could not be loaded
+            </div>
+            <p style={{ fontSize: 12, color: '#a9c6db', lineHeight: 1.6 }}>
+              Check that the heart images exist in the public/models folder and
+              refresh the page.
+            </p>
+            <button
+              type="button"
+              onClick={() => setImageError(false)}
+              style={buttonStyle}
+            >
+              Retry
+            </button>
+          </div>
+        )}
+      </main>
+
+      {!showDiagram && (
+        <div
+          style={{
+            position: 'absolute',
+            left: 16,
+            bottom: 14,
+            zIndex: 3,
+            display: 'flex',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 8,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setViewIndex((value) => (value + images.length - 1) % images.length)}
+            style={buttonStyle}
+            aria-label="Previous heart image"
+          >
+            ← Previous
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewIndex((value) => (value + 1) % images.length)}
+            style={buttonStyle}
+            aria-label="Next heart image"
+          >
+            Next →
+          </button>
+          <span style={{ fontSize: 11, color: '#9bbbd0' }}>
+            {currentImage.label} · {viewIndex + 1}/{images.length}
+          </span>
+        </div>
+      )}
+
+      <div
+        style={{
+          position: 'absolute',
+          right: 16,
+          bottom: 14,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 7,
+          zIndex: 3,
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setZoom((value) => Math.max(0.6, value - 0.15))}
+          style={buttonStyle}
+          aria-label="Zoom out"
+        >
+          −
+        </button>
+        <span style={{ fontSize: 11, color: '#9bbbd0', minWidth: 42, textAlign: 'center' }}>
+          {Math.round(zoom * 100)}%
+        </span>
+        <button
+          type="button"
+          onClick={() => setZoom((value) => Math.min(2.2, value + 0.15))}
+          style={buttonStyle}
+          aria-label="Zoom in"
+        >
+          +
+        </button>
+        <button
+          type="button"
+          onClick={() => setZoom(1)}
+          style={buttonStyle}
+        >
+          Fit
+        </button>
+      </div>
+
+      {showLabels && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 51,
+            left: 16,
+            color: '#77b9d7',
+            fontSize: 10,
+            letterSpacing: 0.7,
+            pointerEvents: 'none',
+          }}
+        >
+          {showDiagram
+            ? 'ANATOMICAL LABELS · REFERENCE'
+            : 'IMAGE VIEWER · ZOOM · ALTERNATE VIEWS'}
+        </div>
+      )}
+    </div>
+  )
+}
